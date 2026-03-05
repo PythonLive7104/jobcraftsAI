@@ -1,0 +1,47 @@
+import { createBrowserRouter } from "react-router";
+import { Layout } from "./components/Layout";
+import { LandingPage } from "./components/pages/LandingPage";
+import { Dashboard } from "./components/pages/Dashboard";
+import { ResumeUpload } from "./components/pages/ResumeUpload";
+import { JobAnalysis } from "./components/pages/JobAnalysis";
+import { ResumeOptimization } from "./components/pages/ResumeOptimization";
+import { CoverLetter } from "./components/pages/CoverLetter";
+import { InterviewPrep } from "./components/pages/InterviewPrep";
+import { LinkedInOptimizer } from "./components/pages/LinkedInOptimizer";
+import { CareerGap } from "./components/pages/CareerGap";
+import { ResumeVersions } from "./components/pages/ResumeVersions";
+import { Pricing } from "./components/pages/Pricing";
+import { Settings } from "./components/pages/Settings";
+import { NotFound } from "./components/pages/NotFound";
+import { Login } from "./components/pages/Login";
+import { Register } from "./components/pages/Register";
+import { ProtectedRoute } from "./components/ProtectedRoute";
+
+export const router = createBrowserRouter([
+  {
+    path: "/",
+    element: <Layout />,
+    children: [
+      { index: true, element: <LandingPage /> },
+      { path: "pricing", element: <Pricing /> },
+      { path: "login", element: <Login /> },
+      { path: "register", element: <Register /> },
+      {
+        element: <ProtectedRoute />,
+        children: [
+          { path: "dashboard", element: <Dashboard /> },
+          { path: "resume", element: <ResumeUpload /> },
+          { path: "job-analysis", element: <JobAnalysis /> },
+          { path: "optimize", element: <ResumeOptimization /> },
+          { path: "cover-letter", element: <CoverLetter /> },
+          { path: "interview-prep", element: <InterviewPrep /> },
+          { path: "linkedin", element: <LinkedInOptimizer /> },
+          { path: "career-gap", element: <CareerGap /> },
+          { path: "versions", element: <ResumeVersions /> },
+          { path: "settings", element: <Settings /> },
+        ],
+      },
+      { path: "*", element: <NotFound /> },
+    ],
+  },
+]);

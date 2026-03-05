@@ -1,0 +1,18 @@
+# JobCrafts AI
+
+JobCrafts AI is a web application that helps job seekers improve job application outcomes using AI tools.
+
+## Core capabilities
+- Resume upload and parsing
+- ATS resume optimization and scoring
+- Cover letter generation
+- Interview preparation support
+- LinkedIn optimization
+- Career gap analysis
+
+## Main pages
+- https://jobcraftsai.com/
+- https://jobcraftsai.com/pricing
+
+## Product summary
+JobCrafts AI provides practical AI workflows for resume quality, ATS alignment, and interview readiness. It supports both free and paid plans.

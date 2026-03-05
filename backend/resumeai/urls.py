@@ -1,0 +1,43 @@
+from django.urls import path
+
+from .views import (
+    ATSOptimizeAPI,
+    CoverLetterAPI,
+    CareerGapAPI,
+    CareerGapHistoryAPI,
+    CareerGapHistoryDetailAPI,
+    InterviewPrepAPI,
+    JobAnalysisAPI,
+    LinkedInOptimizeAPI,
+    DashboardSummaryAPI,
+    PaymentInitializeAPI,
+    PaymentHistoryAPI,
+    PaymentVerifyAPI,
+    MeAPI,
+    ResumeListAPI,
+    ResumeDetailAPI,
+    ResumeUploadAPI,
+    ResumeVersionDetailAPI,
+    ResumeVersionsListAPI,
+)
+
+urlpatterns = [
+    path("me/", MeAPI.as_view()),
+    path("dashboard/summary/", DashboardSummaryAPI.as_view()),
+    path("payments/initialize/", PaymentInitializeAPI.as_view()),
+    path("payments/history/", PaymentHistoryAPI.as_view()),
+    path("payments/verify/", PaymentVerifyAPI.as_view()),
+    path("resumes/", ResumeListAPI.as_view()),
+    path("resumes/upload/", ResumeUploadAPI.as_view()),
+    path("resumes/<uuid:resume_id>/", ResumeDetailAPI.as_view()),
+    path("resumes/<uuid:resume_id>/job-analysis/", JobAnalysisAPI.as_view()),
+    path("resumes/<uuid:resume_id>/ats-optimize/", ATSOptimizeAPI.as_view()),
+    path("resumes/<uuid:resume_id>/cover-letter/", CoverLetterAPI.as_view()),
+    path("resumes/<uuid:resume_id>/interview-prep/", InterviewPrepAPI.as_view()),
+    path("linkedin/optimize/", LinkedInOptimizeAPI.as_view()),
+    path("career-gap/analyze/", CareerGapAPI.as_view()),
+    path("career-gap/history/", CareerGapHistoryAPI.as_view()),
+    path("career-gap/history/<uuid:analysis_id>/", CareerGapHistoryDetailAPI.as_view()),
+    path("resumes/<uuid:resume_id>/versions/", ResumeVersionsListAPI.as_view()),
+    path("versions/<uuid:version_id>/", ResumeVersionDetailAPI.as_view()),
+]

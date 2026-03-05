@@ -1,0 +1,350 @@
+import { useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router';
+import { AlertCircle, CheckCircle, Loader2, Sparkles, Target, TrendingUp } from 'lucide-react';
+import { toast } from 'sonner';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
+import { Button } from '../ui/button';
+import { Progress } from '../ui/progress';
+import { Badge } from '../ui/badge';
+import { Label } from '../ui/label';
+import { Textarea } from '../ui/textarea';
+import { fetchWithAuth, getErrorMessage, parseResponseBody } from '../../lib/api';
+
+type OptimizeSuggestion = {
+  type?: string;
+  section?: string;
+  before?: string;
+  after?: string;
+  keyword?: string;
+  where?: string;
+};
+
+type OptimizeResponse = {
+  resume_id: string;
+  version: {
+    id: string;
+    title: string;
+    target_role: string;
+    job_title: string;
+    optimized_text: string;
+    ats_score: number;
+    created_at: string;
+  };
+  ats: {
+    score: number;
+    breakdown: Record<string, number>;
+    missing_keywords: string[];
+    suggestions: OptimizeSuggestion[];
+  };
+};
+
+type AtsUsageSummary = {
+  used: number;
+  limit: number;
+};
+
+const formatBreakdownLabel = (value: string) =>
+  value
+    .split('_')
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
+
+const formatSuggestion = (suggestion: OptimizeSuggestion) => {
+  if (suggestion.type === 'bullet_rewrite') {
+    const before = suggestion.before ? `"${suggestion.before}"` : 'existing bullet points';
+    const after = suggestion.after ? `"${suggestion.after}"` : 'a stronger rewrite';
+    const section = suggestion.section ? ` in ${suggestion.section}` : '';
+    return `Rewrite ${before}${section} to ${after}.`;
+  }
+  if (suggestion.type === 'add_keyword') {
+    const keyword = suggestion.keyword ?? 'missing keyword';
+    const where = suggestion.where ? ` under ${suggestion.where}` : '';
+    return `Add "${keyword}"${where}.`;
+  }
+  return 'Apply this AI recommendation to improve ATS alignment.';
+};
+
+export function ResumeOptimization() {
+  const resumeId = window.localStorage.getItem('resumeai-current-resume-id');
+  const [jobDescription, setJobDescription] = useState(window.localStorage.getItem('resumeai-last-job-description') ?? '');
+  const [jobTitle, setJobTitle] = useState(window.localStorage.getItem('resumeai-last-job-title') ?? '');
+  const [targetRole, setTargetRole] = useState(window.localStorage.getItem('resumeai-last-job-title') ?? '');
+  const [optimizing, setOptimizing] = useState(false);
+  const [result, setResult] = useState<OptimizeResponse | null>(null);
+  const [atsUsage, setAtsUsage] = useState<AtsUsageSummary | null>(null);
+
+  const breakdownEntries = useMemo(() => {
+    if (!result?.ats.breakdown) return [];
+    return Object.entries(result.ats.breakdown);
+  }, [result]);
+
+  const loadAtsUsage = async () => {
+    const response = await fetchWithAuth('/me/');
+    const data = await parseResponseBody(response);
+    if (!response.ok) {
+      throw new Error(getErrorMessage(data, 'Failed to load ATS usage'));
+    }
+    const payload = data as {
+      subscription?: {
+        limits?: { ats?: number };
+        usage?: { ats?: number };
+      };
+    };
+    const limit = payload.subscription?.limits?.ats ?? 0;
+    const used = payload.subscription?.usage?.ats ?? 0;
+    setAtsUsage({ used, limit });
+  };
+
+  useEffect(() => {
+    void loadAtsUsage();
+  }, []);
+
+  const optimizeResume = async () => {
+    if (!resumeId) {
+      toast.error('Upload a resume first');
+      return;
+    }
+    if (!jobDescription.trim()) {
+      toast.error('Job description is required');
+      return;
+    }
+
+    setOptimizing(true);
+    try {
+      const response = await fetchWithAuth(`/resumes/${resumeId}/ats-optimize/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          job_description: jobDescription,
+          job_title: jobTitle,
+          target_role: targetRole,
+        }),
+      });
+
+      const data = await parseResponseBody(response);
+      if (!response.ok) {
+        throw new Error(getErrorMessage(data, 'Failed to optimize resume'));
+      }
+
+      const optimized = data as OptimizeResponse;
+      setResult(optimized);
+      void loadAtsUsage();
+      window.localStorage.setItem('resumeai-last-job-description', jobDescription);
+      window.localStorage.setItem('resumeai-last-job-title', jobTitle);
+      toast.success('Resume optimization completed');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Optimization failed');
+    } finally {
+      setOptimizing(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-background relative">
+      {optimizing && (
+        <div className="fixed inset-0 z-50 bg-background/40 backdrop-blur-sm flex items-center justify-center px-4">
+          <Card className="w-full max-w-md border-indigo-500/50 bg-gradient-to-br from-indigo-500/15 to-cyan-500/15">
+            <CardContent className="p-6">
+              <div className="flex items-center gap-3">
+                <Loader2 className="w-5 h-5 text-indigo-400 animate-spin" />
+                <div>
+                  <p className="font-medium">Optimizing resume with AI...</p>
+                  <p className="text-sm text-muted-foreground">Please wait while we generate your optimized version.</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold mb-2">AI Resume Optimization</h1>
+          <p className="text-muted-foreground">Optimize your resume against a target job description</p>
+        </div>
+
+        {atsUsage && (
+          <Card className="mb-6 border-border/50">
+            <CardContent className="p-4">
+              <p className="text-sm text-muted-foreground">
+                Monthly ATS usage:{' '}
+                <span className="font-medium text-foreground">
+                  {atsUsage.used}/{atsUsage.limit}
+                </span>
+              </p>
+            </CardContent>
+          </Card>
+        )}
+
+        {!resumeId && (
+          <Card className="mb-6 border-amber-500/40 bg-amber-500/10">
+            <CardContent className="p-4 flex items-center justify-between gap-4">
+              <p className="text-sm text-amber-300">Upload a resume first before running optimization.</p>
+              <Link to="/resume">
+                <Button size="sm" variant="outline">
+                  Go to Resume Upload
+                </Button>
+              </Link>
+            </CardContent>
+          </Card>
+        )}
+
+        <div className="space-y-6">
+          <Card className="border-border/50">
+            <CardHeader>
+              <CardTitle>Target Job Inputs</CardTitle>
+              <CardDescription>These fields are used by the optimization engine</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <Label htmlFor="target-role">Target Role (Optional)</Label>
+                <Textarea
+                  id="target-role"
+                  placeholder="e.g. Senior Backend Engineer"
+                  className="min-h-[60px] mt-2"
+                  value={targetRole}
+                  onChange={(event) => setTargetRole(event.target.value)}
+                />
+              </div>
+              <div>
+                <Label htmlFor="job-title">Job Title (Optional)</Label>
+                <Textarea
+                  id="job-title"
+                  placeholder="e.g. Backend Engineer"
+                  className="min-h-[60px] mt-2"
+                  value={jobTitle}
+                  onChange={(event) => setJobTitle(event.target.value)}
+                />
+              </div>
+              <div>
+                <Label htmlFor="job-description">Job Description</Label>
+                <Textarea
+                  id="job-description"
+                  placeholder="Paste job description here..."
+                  className="min-h-[220px] mt-2"
+                  value={jobDescription}
+                  onChange={(event) => setJobDescription(event.target.value)}
+                />
+              </div>
+              <Button onClick={optimizeResume} disabled={optimizing || !resumeId || !jobDescription.trim()} className="gap-2">
+                {optimizing ? (
+                  <>
+                    <Sparkles className="w-4 h-4 animate-spin" />
+                    Optimizing...
+                  </>
+                ) : (
+                  <>
+                    <Target className="w-4 h-4" />
+                    Optimize Resume
+                  </>
+                )}
+              </Button>
+            </CardContent>
+          </Card>
+
+          {result && (
+            <>
+              <Card className="border-emerald-500/50 bg-gradient-to-br from-emerald-500/10 to-cyan-500/10">
+                <CardContent className="p-6">
+                  <div className="flex items-start gap-4">
+                    <div className="w-12 h-12 rounded-full bg-emerald-500/20 flex items-center justify-center flex-shrink-0">
+                      <CheckCircle className="w-6 h-6 text-emerald-400" />
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="font-semibold mb-2">Optimization Complete</h3>
+                      <p className="text-sm text-muted-foreground mb-4">Your optimized version has been saved.</p>
+                      <div className="flex items-center gap-4">
+                        <div className="flex-1">
+                          <Progress value={result.ats.score} className="h-3" />
+                        </div>
+                        <span className="text-3xl font-bold text-emerald-400">{result.ats.score}%</span>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="border-border/50">
+                <CardHeader>
+                  <CardTitle>ATS Breakdown</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {breakdownEntries.map(([key, value]) => (
+                    <div key={key} className="space-y-2">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="font-medium">{formatBreakdownLabel(key)}</span>
+                        <span className="text-muted-foreground">{value}%</span>
+                      </div>
+                      <Progress value={value} />
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+
+              <Card className="border-border/50">
+                <CardHeader>
+                  <CardTitle>Missing Keywords</CardTitle>
+                  <CardDescription>Add these strategically where they are genuinely relevant</CardDescription>
+                </CardHeader>
+                <CardContent className="flex flex-wrap gap-2">
+                  {result.ats.missing_keywords.length > 0 ? (
+                    result.ats.missing_keywords.map((kw) => (
+                      <Badge key={kw} className="bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                        <AlertCircle className="w-3 h-3 mr-1" />
+                        {kw}
+                      </Badge>
+                    ))
+                  ) : (
+                    <span className="text-sm text-muted-foreground">No major keyword gaps detected.</span>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card className="border-border/50">
+                <CardHeader>
+                  <CardTitle>AI Suggestions</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {result.ats.suggestions.length > 0 ? (
+                    result.ats.suggestions.map((suggestion, index) => (
+                      <div key={`${suggestion.type ?? 'suggestion'}-${index}`} className="p-4 rounded-lg bg-muted/30">
+                        <div className="flex items-center gap-2 mb-2">
+                          <Badge variant="secondary">{suggestion.type ?? 'suggestion'}</Badge>
+                          {suggestion.section && <Badge variant="outline">{suggestion.section}</Badge>}
+                        </div>
+                        <p className="text-sm text-muted-foreground">{formatSuggestion(suggestion)}</p>
+                      </div>
+                    ))
+                  ) : (
+                    <span className="text-sm text-muted-foreground">No suggestions returned.</span>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card className="border-border/50">
+                <CardHeader>
+                  <CardTitle>Optimized Resume Text</CardTitle>
+                  <CardDescription>Saved as a version in your account</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="rounded-lg border border-border/60 bg-muted/20 p-4 max-h-[420px] overflow-auto">
+                    <pre className="text-xs whitespace-pre-wrap text-muted-foreground">{result.version.optimized_text}</pre>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="border-border/50">
+                <CardContent className="p-4 text-sm text-muted-foreground flex items-center gap-2">
+                  <TrendingUp className="w-4 h-4 text-emerald-400" />
+                  Saved version: {result.version.title} ({result.version.id})
+                </CardContent>
+              </Card>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
