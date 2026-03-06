@@ -1,5 +1,6 @@
 import uuid
 import os
+from datetime import timedelta
 from django.contrib.auth import get_user_model
 from django.conf import settings
 from django.db import models
@@ -33,6 +34,7 @@ class UserSubscription(models.Model):
     interview_prep_uses = models.PositiveIntegerField(default=0)
     linkedin_uses = models.PositiveIntegerField(default=0)
     career_gap_uses = models.PositiveIntegerField(default=0)
+    expiry_reminder_sent_for_period = models.DateField(null=True, blank=True)
 
     def reset_if_new_month(self):
         today = timezone.now().date()
@@ -44,6 +46,7 @@ class UserSubscription(models.Model):
             self.interview_prep_uses = 0
             self.linkedin_uses = 0
             self.career_gap_uses = 0
+            self.expiry_reminder_sent_for_period = None
             self.save(
                 update_fields=[
                     "period_start",
@@ -53,8 +56,20 @@ class UserSubscription(models.Model):
                     "interview_prep_uses",
                     "linkedin_uses",
                     "career_gap_uses",
+                    "expiry_reminder_sent_for_period",
                 ]
             )
+
+    def expiry_date(self):
+        if self.plan == Plan.FREE:
+            return None
+        return self.period_start + timedelta(days=30)
+
+    def days_until_expiry(self):
+        expires_on = self.expiry_date()
+        if not expires_on:
+            return None
+        return (expires_on - timezone.now().date()).days
 
     def limit_for(self, feature: str) -> int:
         def _int_env(name: str, default: int) -> int:
@@ -321,3 +336,17 @@ class EmailCampaign(models.Model):
             elif self.status == EmailCampaignStatus.SCHEDULED:
                 self.status = EmailCampaignStatus.DRAFT
         super().save(*args, **kwargs)
+
+
+class ContactMessage(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    name = models.CharField(max_length=120)
+    email = models.EmailField()
+    message = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.name} <{self.email}>"

@@ -1,7 +1,13 @@
+import { useState } from 'react';
 import { Link } from 'react-router';
 import { Button } from '../ui/button';
 import { Card, CardContent } from '../ui/card';
 import { useAuth } from '../../context/AuthContext';
+import { Input } from '../ui/input';
+import { Label } from '../ui/label';
+import { Textarea } from '../ui/textarea';
+import { toast } from 'sonner';
+import { buildUrl, getErrorMessage, parseResponseBody } from '../../lib/api';
 import { 
   Sparkles, 
   FileText, 
@@ -14,11 +20,24 @@ import {
   ArrowRight,
   Zap,
   Shield,
-  Globe
+  Globe,
+  Instagram,
+  Facebook,
+  Youtube
 } from 'lucide-react';
 
 export function LandingPage() {
   const { user } = useAuth();
+  const [contactName, setContactName] = useState('');
+  const [contactEmail, setContactEmail] = useState('');
+  const [contactMessage, setContactMessage] = useState('');
+  const [sendingContact, setSendingContact] = useState(false);
+  const socialLinks = {
+    linkedin: '#',
+    instagram: '#',
+    facebook: '#',
+    youtube: '#',
+  };
   const features = [
     {
       icon: Target,
@@ -96,6 +115,34 @@ export function LandingPage() {
       popular: true,
     },
   ];
+
+  const handleContactSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setSendingContact(true);
+    try {
+      const response = await fetch(buildUrl('/contact/'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: contactName,
+          email: contactEmail,
+          message: contactMessage,
+        }),
+      });
+      const data = await parseResponseBody(response);
+      if (!response.ok) {
+        throw new Error(getErrorMessage(data, 'Unable to send message'));
+      }
+      toast.success('Message sent. We will get back to you soon.');
+      setContactName('');
+      setContactEmail('');
+      setContactMessage('');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Unable to send message');
+    } finally {
+      setSendingContact(false);
+    }
+  };
 
   return (
     <div className="min-h-screen">
@@ -285,6 +332,96 @@ export function LandingPage() {
                 Get Started Free <ArrowRight className="w-4 h-4" />
               </Button>
             </Link>
+          </div>
+        </div>
+      </section>
+
+      {/* Contact and Social */}
+      <section className="py-16 border-t border-border/50 bg-muted/10">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 grid gap-8 lg:grid-cols-2">
+          <div>
+            <h3 className="text-2xl font-semibold mb-4">Contact Us</h3>
+            <form className="space-y-3 max-w-xl" onSubmit={handleContactSubmit}>
+              <div className="grid sm:grid-cols-2 gap-3">
+                <div>
+                  <Label htmlFor="contactName">Name</Label>
+                  <Input
+                    id="contactName"
+                    value={contactName}
+                    onChange={(event) => setContactName(event.target.value)}
+                    required
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="contactEmail">Email</Label>
+                  <Input
+                    id="contactEmail"
+                    type="email"
+                    value={contactEmail}
+                    onChange={(event) => setContactEmail(event.target.value)}
+                    required
+                  />
+                </div>
+              </div>
+              <div>
+                <Label htmlFor="contactMessage">Message</Label>
+                <Textarea
+                  id="contactMessage"
+                  value={contactMessage}
+                  onChange={(event) => setContactMessage(event.target.value)}
+                  rows={4}
+                  required
+                />
+              </div>
+              <Button type="submit" disabled={sendingContact}>
+                {sendingContact ? 'Sending...' : 'Send Message'}
+              </Button>
+            </form>
+          </div>
+
+          <div>
+            <h3 className="text-2xl font-semibold mb-4">Follow Us</h3>
+            <p className="text-sm text-muted-foreground mb-4">
+              Social links are ready. We will plug in your real URLs when you share them.
+            </p>
+            <div className="flex items-center gap-3">
+              <a
+                href={socialLinks.linkedin}
+                className="w-10 h-10 rounded-full border border-border flex items-center justify-center hover:bg-muted transition-colors"
+                aria-label="LinkedIn"
+                target="_blank"
+                rel="noreferrer"
+              >
+                <Linkedin className="w-5 h-5" />
+              </a>
+              <a
+                href={socialLinks.instagram}
+                className="w-10 h-10 rounded-full border border-border flex items-center justify-center hover:bg-muted transition-colors"
+                aria-label="Instagram"
+                target="_blank"
+                rel="noreferrer"
+              >
+                <Instagram className="w-5 h-5" />
+              </a>
+              <a
+                href={socialLinks.facebook}
+                className="w-10 h-10 rounded-full border border-border flex items-center justify-center hover:bg-muted transition-colors"
+                aria-label="Facebook"
+                target="_blank"
+                rel="noreferrer"
+              >
+                <Facebook className="w-5 h-5" />
+              </a>
+              <a
+                href={socialLinks.youtube}
+                className="w-10 h-10 rounded-full border border-border flex items-center justify-center hover:bg-muted transition-colors"
+                aria-label="YouTube"
+                target="_blank"
+                rel="noreferrer"
+              >
+                <Youtube className="w-5 h-5" />
+              </a>
+            </div>
           </div>
         </div>
       </section>

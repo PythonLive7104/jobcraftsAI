@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import { getErrorMessage, parseResponseBody } from '../lib/api';
 
 type AuthUser = {
   id: number;
@@ -33,24 +34,6 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://127.0.0.1:8000
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 const buildUrl = (path: string) => `${API_BASE_URL}${path}`;
-
-const getErrorMessage = (data: unknown): string => {
-  if (!data || typeof data !== 'object') return 'Request failed';
-  const maybeObj = data as Record<string, unknown>;
-
-  if (typeof maybeObj.detail === 'string') return maybeObj.detail;
-
-  for (const value of Object.values(maybeObj)) {
-    if (Array.isArray(value) && value.length > 0 && typeof value[0] === 'string') {
-      return value[0];
-    }
-    if (typeof value === 'string') {
-      return value;
-    }
-  }
-
-  return 'Request failed';
-};
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
@@ -96,7 +79,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       throw new Error('Session expired');
     }
 
-    const data = (await response.json()) as { access: string };
+    const body = await parseResponseBody(response);
+    if (!response.ok) {
+      throw new Error(getErrorMessage(body, 'Session expired'));
+    }
+    const data = body as { access: string };
     window.localStorage.setItem(ACCESS_TOKEN_KEY, data.access);
     return data.access;
   };
@@ -136,9 +123,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       body: JSON.stringify({ username, password }),
     });
 
-    const data = await response.json();
+    if (response.status === 404) {
+      throw new Error('Authentication endpoint not found. Check backend URL and port.');
+    }
+
+    const data = await parseResponseBody(response);
     if (!response.ok) {
-      throw new Error(getErrorMessage(data));
+      throw new Error(getErrorMessage(data, 'Login failed'));
     }
 
     const tokens = data as { access: string; refresh: string };
@@ -154,9 +145,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       body: JSON.stringify(payload),
     });
 
-    const data = await response.json();
+    if (response.status === 404) {
+      throw new Error('Registration endpoint not found. Check backend URL and port.');
+    }
+
+    const data = await parseResponseBody(response);
     if (!response.ok) {
-      throw new Error(getErrorMessage(data));
+      throw new Error(getErrorMessage(data, 'Registration failed'));
     }
 
     const registerData = data as {

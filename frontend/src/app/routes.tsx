@@ -15,6 +15,8 @@ import { Settings } from "./components/pages/Settings";
 import { NotFound } from "./components/pages/NotFound";
 import { Login } from "./components/pages/Login";
 import { Register } from "./components/pages/Register";
+import { ForgotPassword } from "./components/pages/ForgotPassword";
+import { ResetPassword } from "./components/pages/ResetPassword";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 
 export const router = createBrowserRouter([
@@ -26,6 +28,8 @@ export const router = createBrowserRouter([
       { path: "pricing", element: <Pricing /> },
       { path: "login", element: <Login /> },
       { path: "register", element: <Register /> },
+      { path: "forgot-password", element: <ForgotPassword /> },
+      { path: "reset-password", element: <ResetPassword /> },
       {
         element: <ProtectedRoute />,
         children: [

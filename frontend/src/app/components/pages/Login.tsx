@@ -69,6 +69,11 @@ export function Login() {
               {submitting ? 'Logging in...' : 'Login'}
             </Button>
           </form>
+          <p className="text-sm mt-3 text-center">
+            <Link to="/forgot-password" className="text-indigo-400 hover:text-indigo-300">
+              Forgot password?
+            </Link>
+          </p>
           <p className="text-sm text-muted-foreground mt-4 text-center">
             Don&apos;t have an account?{' '}
             <Link to="/register" className="text-indigo-400 hover:text-indigo-300">

@@ -4,16 +4,17 @@ import os
 import uuid
 
 from django.db.models import Avg
-from rest_framework import status
+from rest_framework import serializers, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from openai import OpenAIError
 import requests
 
 from .models import (
+    ContactMessage,
     CareerGapAnalysis,
     Resume,
     ResumeVersion,
@@ -40,6 +41,13 @@ from .ai import (
     linkedin_optimize,
     career_gap_analyze,
 )
+from .emailing import send_email_via_resend
+
+
+class ContactMessageSerializer(serializers.Serializer):
+    name = serializers.CharField(max_length=120)
+    email = serializers.EmailField()
+    message = serializers.CharField(max_length=5000)
 
 
 class MeAPI(APIView):
@@ -50,6 +58,43 @@ class MeAPI(APIView):
             "user": {"id": request.user.id, "email": request.user.email, "username": request.user.get_username()},
             "subscription": SubscriptionSerializer(sub).data
         })
+
+
+class ContactUsAPI(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        serializer = ContactMessageSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        payload = serializer.validated_data
+        contact = ContactMessage.objects.create(
+            name=payload["name"].strip(),
+            email=payload["email"].strip(),
+            message=payload["message"].strip(),
+        )
+
+        support_email = os.getenv("SUPPORT_EMAIL", "").strip() or os.getenv("RESEND_FROM_EMAIL", "").strip()
+        if support_email:
+            subject = f"New contact message from {contact.name}"
+            html = f"""
+            <div style="font-family:Arial,sans-serif;line-height:1.5;color:#111;">
+              <h2 style="margin:0 0 12px;">New contact form message</h2>
+              <p><strong>Name:</strong> {contact.name}</p>
+              <p><strong>Email:</strong> {contact.email}</p>
+              <p><strong>Message:</strong></p>
+              <div style="white-space:pre-wrap;border:1px solid #ddd;padding:10px;border-radius:8px;">{contact.message}</div>
+            </div>
+            """.strip()
+            text = f"Name: {contact.name}\nEmail: {contact.email}\n\n{contact.message}"
+            send_email_via_resend(
+                to_email=support_email,
+                subject=subject,
+                html=html,
+                text=text,
+            )
+
+        return Response({"detail": "Message received. We will get back to you soon."}, status=status.HTTP_201_CREATED)
 
 
 class PaymentInitializeAPI(APIView):

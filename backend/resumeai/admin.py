@@ -5,7 +5,7 @@ from django.urls import path, reverse
 from django.utils import timezone
 from django.utils.html import format_html
 
-from .models import EmailCampaign, EmailCampaignStatus
+from .models import ContactMessage, EmailCampaign, EmailCampaignStatus
 
 
 @admin.register(EmailCampaign)
@@ -129,3 +129,11 @@ class EmailCampaignAdmin(admin.ModelAdmin):
             f"Due campaigns processed. Sent: {total_sent}, Failed: {total_failed}",
             level=messages.INFO,
         )
+
+
+@admin.register(ContactMessage)
+class ContactMessageAdmin(admin.ModelAdmin):
+    list_display = ("name", "email", "created_at")
+    search_fields = ("name", "email", "message")
+    readonly_fields = ("name", "email", "message", "created_at")
+    ordering = ("-created_at",)

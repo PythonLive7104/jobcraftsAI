@@ -6,16 +6,17 @@ This project now includes:
 
 ## 1) Frontend setup
 
-From the project root:
+From `frontend`:
 
 ```bash
+cd frontend
 npm install
 npm run dev
 ```
 
 Frontend runs on `http://localhost:5173`.
 
-If needed, create a `.env` file in the project root:
+If needed, create a `.env` file in `frontend`:
 
 ```env
 VITE_API_BASE_URL=http://127.0.0.1:8000/api
