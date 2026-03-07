@@ -26,8 +26,12 @@ load_env_file()
 
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "django-insecure-change-me-in-production")
 DEBUG = os.getenv("DJANGO_DEBUG", "1") == "1"
-ALLOWED_HOSTS = os.getenv("DJANGO_ALLOWED_HOSTS", "127.0.0.1,localhost, echooconnet.com, www.echooconnet.com").split(",")
-
+ALLOWED_HOSTS = [
+    "echooconnet.com",
+    "www.echooconnet.com",
+    "127.0.0.1",
+    "localhost",
+]
 
 INSTALLED_APPS = [
     "django.contrib.admin",
