@@ -8,8 +8,6 @@ services:
       - ./backend/.env
     volumes:
       - ./backend:/app/backend
-    ports:
-      - "8000:8000"
     command: sh -c "python manage.py migrate && python manage.py runserver 0.0.0.0:8000"
 
   frontend:
@@ -20,10 +18,21 @@ services:
     depends_on:
       - backend
     environment:
-      - VITE_API_BASE_URL=http://172.239.110.103:8000/api
+      - VITE_API_BASE_UR:"/api/v1"
     volumes:
       - ./frontend:/app/frontend
       - /app/frontend/node_modules
     ports:
       - "5173:5173"
     command: npm run dev -- --host 0.0.0.0 --port 5173
+
+  nginx:
+    image: nginx:latest
+    container_name: jobcrafts_nginx
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf
+    depends_on:
+      - frontend
+      - backend
