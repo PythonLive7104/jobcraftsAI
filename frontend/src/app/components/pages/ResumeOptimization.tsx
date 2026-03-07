@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router';
-import { AlertCircle, CheckCircle, Loader2, Sparkles, Target, TrendingUp } from 'lucide-react';
+import { AlertCircle, CheckCircle, FileText, Loader2, Sparkles, Target, TrendingUp } from 'lucide-react';
 import { toast } from 'sonner';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
@@ -43,6 +43,14 @@ type AtsUsageSummary = {
   limit: number;
 };
 
+type ResumeListItem = {
+  id: string;
+  filename: string;
+  file_type: string;
+  parse_status: string;
+  created_at: string;
+};
+
 const formatBreakdownLabel = (value: string) =>
   value
     .split('_')
@@ -65,13 +73,22 @@ const formatSuggestion = (suggestion: OptimizeSuggestion) => {
 };
 
 export function ResumeOptimization() {
-  const resumeId = window.localStorage.getItem('resumeai-current-resume-id');
+  const storedResumeId = window.localStorage.getItem('resumeai-current-resume-id');
+  const [selectedResumeId, setSelectedResumeId] = useState<string | null>(storedResumeId);
+  const [savedResumes, setSavedResumes] = useState<ResumeListItem[]>([]);
+  const [loadingResumes, setLoadingResumes] = useState(true);
   const [jobDescription, setJobDescription] = useState(window.localStorage.getItem('resumeai-last-job-description') ?? '');
   const [jobTitle, setJobTitle] = useState(window.localStorage.getItem('resumeai-last-job-title') ?? '');
   const [targetRole, setTargetRole] = useState(window.localStorage.getItem('resumeai-last-job-title') ?? '');
   const [optimizing, setOptimizing] = useState(false);
   const [result, setResult] = useState<OptimizeResponse | null>(null);
   const [atsUsage, setAtsUsage] = useState<AtsUsageSummary | null>(null);
+
+  const resumeId = selectedResumeId;
+  const selectedResume = useMemo(
+    () => savedResumes.find((r) => r.id === resumeId) ?? null,
+    [savedResumes, resumeId],
+  );
 
   const breakdownEntries = useMemo(() => {
     if (!result?.ats.breakdown) return [];
@@ -95,8 +112,48 @@ export function ResumeOptimization() {
     setAtsUsage({ used, limit });
   };
 
+  const loadSavedResumes = async () => {
+    setLoadingResumes(true);
+    try {
+      const response = await fetchWithAuth('/resumes/');
+      const data = await parseResponseBody(response);
+      if (!response.ok) {
+        throw new Error(getErrorMessage(data, 'Failed to load resumes'));
+      }
+      const items = (data as { items?: ResumeListItem[] })?.items ?? [];
+      setSavedResumes(items);
+      const storedId = window.localStorage.getItem('resumeai-current-resume-id');
+      if (storedId && items.some((r) => r.id === storedId)) {
+        setSelectedResumeId(storedId);
+      } else if (items.length > 0) {
+        const firstId = items[0].id;
+        setSelectedResumeId(firstId);
+        window.localStorage.setItem('resumeai-current-resume-id', firstId);
+      } else {
+        setSelectedResumeId(null);
+      }
+    } catch {
+      setSavedResumes([]);
+    } finally {
+      setLoadingResumes(false);
+    }
+  };
+
+  const handleSelectResume = (resumeId: string) => {
+    setSelectedResumeId(resumeId || null);
+    if (resumeId) {
+      window.localStorage.setItem('resumeai-current-resume-id', resumeId);
+    } else {
+      window.localStorage.removeItem('resumeai-current-resume-id');
+    }
+  };
+
   useEffect(() => {
     void loadAtsUsage();
+  }, []);
+
+  useEffect(() => {
+    void loadSavedResumes();
   }, []);
 
   const optimizeResume = async () => {
@@ -178,7 +235,14 @@ export function ResumeOptimization() {
           </Card>
         )}
 
-        {!resumeId && (
+        {loadingResumes ? (
+          <Card className="mb-6 border-border/50">
+            <CardContent className="p-4 flex items-center gap-2 text-sm text-muted-foreground">
+              <Loader2 className="w-4 h-4 animate-spin" />
+              Loading saved resumes...
+            </CardContent>
+          </Card>
+        ) : savedResumes.length === 0 ? (
           <Card className="mb-6 border-amber-500/40 bg-amber-500/10">
             <CardContent className="p-4 flex items-center justify-between gap-4">
               <p className="text-sm text-amber-300">Upload a resume first before running optimization.</p>
@@ -187,6 +251,37 @@ export function ResumeOptimization() {
                   Go to Resume Upload
                 </Button>
               </Link>
+            </CardContent>
+          </Card>
+        ) : (
+          <Card className="mb-6 border-border/50">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <FileText className="w-5 h-5 text-indigo-400" />
+                Resume to Optimize
+              </CardTitle>
+              <CardDescription>Select which saved resume you want to optimize for the target job</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <Label htmlFor="optimize-resume-select">Choose resume</Label>
+              <select
+                id="optimize-resume-select"
+                value={resumeId ?? ''}
+                onChange={(e) => handleSelectResume(e.target.value)}
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              >
+                <option value="">Select a resume...</option>
+                {savedResumes.map((resume) => (
+                  <option key={resume.id} value={resume.id}>
+                    {resume.filename || resume.id} — {resume.parse_status} — {new Date(resume.created_at).toLocaleDateString()}
+                  </option>
+                ))}
+              </select>
+              {selectedResume && (
+                <p className="text-sm text-muted-foreground">
+                  Selected: <span className="font-medium text-foreground">{selectedResume.filename || selectedResume.id}</span>
+                </p>
+              )}
             </CardContent>
           </Card>
         )}

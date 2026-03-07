@@ -117,11 +117,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const login = async (username: string, password: string) => {
-    const response = await fetch(buildUrl('/auth/login/'), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, password }),
-    });
+    let response: Response;
+    try {
+      response = await fetch(buildUrl('/auth/login/'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password }),
+      });
+    } catch (err) {
+      throw new Error('Could not reach server. Ensure the backend is running on port 8000.');
+    }
 
     if (response.status === 404) {
       throw new Error('Authentication endpoint not found. Check backend URL and port.');
@@ -139,11 +144,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const register = async (payload: RegisterPayload) => {
-    const response = await fetch(buildUrl('/auth/register/'), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
+    let response: Response;
+    try {
+      response = await fetch(buildUrl('/auth/register/'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+    } catch (err) {
+      throw new Error('Could not reach server. Ensure the backend is running on port 8000.');
+    }
 
     if (response.status === 404) {
       throw new Error('Registration endpoint not found. Check backend URL and port.');

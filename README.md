@@ -36,14 +36,32 @@ python manage.py runserver
 
 Backend runs on `http://127.0.0.1:8000`.
 
-## 3) Auth endpoints
+## 3) Docker setup (frontend + backend)
+
+From project root:
+
+```bash
+docker compose up --build
+```
+
+Services:
+- Frontend: `http://localhost:5173`
+- Backend API: `http://localhost:8000`
+
+To stop:
+
+```bash
+docker compose down
+```
+
+## 4) Auth endpoints
 
 - `POST /api/auth/register/`
 - `POST /api/auth/login/`
 - `POST /api/auth/refresh/`
 - `GET /api/auth/me/`
 
-## 4) Login flow in app
+## 5) Login flow in app
 
 - Register at `/register`
 - Login at `/login`
