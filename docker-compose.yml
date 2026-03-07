@@ -21,7 +21,7 @@ services:
     depends_on:
       - backend
     environment:
-      - VITE_API_BASE_UR:"/api/v1"
+      - VITE_API_BASE_URL=/api/v1
     volumes:
       - ./frontend:/app/frontend
       - /app/frontend/node_modules
@@ -36,8 +36,8 @@ services:
       - "80:80"
     volumes:
       - ./nginx/default.conf:/etc/nginx/conf.d/default.conf
-      - ./backend-drf/staticfiles:/staticfiles
-      - ./backend-drf/media:/media
+      - ./backend/staticfiles:/app/backend/staticfiles
+      - ./backend/media:/app/backend/media
     depends_on:
       - frontend
       - backend
