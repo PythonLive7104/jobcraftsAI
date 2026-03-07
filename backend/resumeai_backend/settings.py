@@ -75,12 +75,38 @@ WSGI_APPLICATION = "resumeai_backend.wsgi.application"
 ASGI_APPLICATION = "resumeai_backend.asgi.application"
 
 
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / "db.sqlite3",
+_db_host = (os.getenv("DB_HOST") or "").strip()
+_db_name = (os.getenv("DB_NAME") or "").strip()
+_db_user = (os.getenv("DB_USER") or "").strip()
+_db_pass = os.getenv("DB_PASSWORD", "")
+_db_port = (os.getenv("DB_PORT") or "5432").strip()
+_db_ssl = (os.getenv("DB_SSLMODE") or "require").strip()
+
+_use_postgres = _db_host and _db_name and _db_user
+
+if _use_postgres:
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.postgresql",
+            "NAME": _db_name,
+            "USER": _db_user,
+            "PASSWORD": _db_pass,
+            "HOST": _db_host,
+            "PORT": _db_port,
+            "OPTIONS": {
+                "sslmode": _db_ssl,
+                "connect_timeout": 10,
+            },
+            "CONN_MAX_AGE": 0,
+        }
     }
-}
+else:
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": BASE_DIR / "db.sqlite3",
+        }
+    }
 
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
