@@ -17,6 +17,11 @@ export default defineConfig({
     },
   },
 
+  server: {
+    host: true,
+    allowedHosts: ['echooconnet.com', 'www.echooconnet.com'],
+  },
+
   // File types to support raw imports. Never add .css, .tsx, or .ts files to this.
   assetsInclude: ['**/*.svg', '**/*.csv'],
 })
