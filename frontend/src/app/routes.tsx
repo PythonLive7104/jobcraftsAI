@@ -18,6 +18,8 @@ import { Register } from "./components/pages/Register";
 import { ForgotPassword } from "./components/pages/ForgotPassword";
 import { ResetPassword } from "./components/pages/ResetPassword";
 import { VerifyEmail } from "./components/pages/VerifyEmail";
+import { Portfolio } from "./components/pages/Portfolio";
+import { PortfolioPublic } from "./components/pages/PortfolioPublic";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 
 export const router = createBrowserRouter([
@@ -32,6 +34,7 @@ export const router = createBrowserRouter([
       { path: "forgot-password", element: <ForgotPassword /> },
       { path: "reset-password", element: <ResetPassword /> },
       { path: "verify-email", element: <VerifyEmail /> },
+      { path: "p/:slug", element: <PortfolioPublic /> },
       {
         element: <ProtectedRoute />,
         children: [
@@ -44,6 +47,7 @@ export const router = createBrowserRouter([
           { path: "linkedin", element: <LinkedInOptimizer /> },
           { path: "career-gap", element: <CareerGap /> },
           { path: "versions", element: <ResumeVersions /> },
+          { path: "portfolio", element: <Portfolio /> },
           { path: "settings", element: <Settings /> },
         ],
       },

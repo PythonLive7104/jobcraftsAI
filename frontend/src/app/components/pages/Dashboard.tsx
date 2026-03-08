@@ -17,6 +17,7 @@ import {
   CheckCircle,
   Clock,
   Loader2,
+  Globe,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { fetchWithAuth, parseResponseBody } from '../../lib/api';
@@ -33,6 +34,11 @@ type DashboardSummary = {
     ats_used: number;
     ats_limit: number;
     ats_remaining: number;
+    is_pro?: boolean;
+  };
+  portfolio?: {
+    has_portfolio: boolean;
+    share_url: string | null;
   };
   recent_activity: Array<{
     action: string;
@@ -108,6 +114,13 @@ export function Dashboard() {
       description: 'Identify skill gaps',
       path: '/career-gap',
       color: 'from-orange-500 to-red-500',
+    },
+    {
+      icon: Globe,
+      title: 'Portfolio',
+      description: 'Share your profile with recruiters (Pro)',
+      path: '/portfolio',
+      color: 'from-rose-500 to-amber-500',
     },
   ];
 
@@ -191,6 +204,39 @@ export function Dashboard() {
           </Card>
         </div>
 
+        {/* Portfolio (Pro) */}
+        {summary?.plan?.is_pro && (
+          <Card className="mb-8 border-rose-500/30 bg-gradient-to-br from-rose-500/5 to-amber-500/5">
+            <CardContent className="p-6">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-rose-500 to-amber-500 flex items-center justify-center">
+                    <Globe className="w-6 h-6 text-white" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold mb-1">Your Portfolio</h3>
+                    <p className="text-sm text-muted-foreground">
+                      {summary.portfolio?.has_portfolio
+                        ? 'Share your portfolio link with recruiters'
+                        : 'Create a shareable portfolio page'}
+                    </p>
+                    {summary.portfolio?.share_url && (
+                      <p className="text-sm text-indigo-500 mt-1 font-mono truncate max-w-md">
+                        {summary.portfolio.share_url}
+                      </p>
+                    )}
+                  </div>
+                </div>
+                <Link to="/portfolio">
+                  <Button variant={summary.portfolio?.has_portfolio ? 'outline' : 'default'} className="gap-2">
+                    {summary.portfolio?.has_portfolio ? 'Edit Portfolio' : 'Create Portfolio'}
+                  </Button>
+                </Link>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Current Plan */}
         <Card className="mb-8 border-indigo-500/50 bg-gradient-to-br from-indigo-500/10 to-cyan-500/10">
           <CardContent className="p-6">
@@ -204,11 +250,13 @@ export function Dashboard() {
                 </p>
                 <Progress value={planProgress} className="mt-3 w-48" />
               </div>
-              <Link to="/pricing">
-                <Button className="gap-2">
-                  Upgrade to Pro <ArrowRight className="w-4 h-4" />
-                </Button>
-              </Link>
+              {!summary?.plan?.is_pro && (
+                <Link to="/pricing">
+                  <Button className="gap-2">
+                    Upgrade to Pro <ArrowRight className="w-4 h-4" />
+                  </Button>
+                </Link>
+              )}
             </div>
           </CardContent>
         </Card>

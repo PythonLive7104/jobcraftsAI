@@ -65,6 +65,7 @@ export function Pricing() {
         'LinkedIn profile optimizer',
         'Advanced interview prep',
         'Career gap analysis',
+        'Shareable portfolio page',
         'Resume version manager',
         'Priority support',
         'Export to all formats',

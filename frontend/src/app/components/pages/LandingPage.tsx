@@ -69,6 +69,11 @@ export function LandingPage() {
       title: 'Career Gap Analysis',
       description: 'Identify skill gaps and get personalized learning roadmaps',
     },
+    {
+      icon: Globe,
+      title: 'Shareable Portfolio',
+      description: 'Create a professional portfolio page to share with recruiters (Pro)',
+    },
   ];
 
   const pricingTiers = [
@@ -108,6 +113,7 @@ export function LandingPage() {
         '50 cover letters per month',
         'Advanced interview prep',
         'Career gap analysis',
+        'Shareable portfolio page',
         'Resume version manager',
         'Priority support',
       ],
@@ -453,6 +459,7 @@ export function LandingPage() {
                 <Link to="/optimize" className="block text-muted-foreground hover:text-foreground transition-colors">Resume Optimizer</Link>
                 <Link to="/cover-letter" className="block text-muted-foreground hover:text-foreground transition-colors">Cover Letter</Link>
                 <Link to="/interview-prep" className="block text-muted-foreground hover:text-foreground transition-colors">Interview Prep</Link>
+                <Link to="/portfolio" className="block text-muted-foreground hover:text-foreground transition-colors">Portfolio (Pro)</Link>
               </div>
             </div>
 
