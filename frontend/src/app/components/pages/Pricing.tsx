@@ -96,8 +96,10 @@ export function Pricing() {
         toast.success(payload.message || 'Payment verified successfully');
         navigate('/dashboard', { replace: true });
       } catch (error) {
-        toast.error(error instanceof Error ? error.message : 'Payment verification failed');
-        navigate('/pricing', { replace: true });
+        const msg = error instanceof Error ? error.message : 'Payment verification failed';
+        toast.error(msg);
+        // Keep reference in URL so user can retry (e.g. after webhook updates plan)
+        navigate(`/pricing?reference=${encodeURIComponent(reference)}`, { replace: true });
       } finally {
         setVerifying(false);
       }

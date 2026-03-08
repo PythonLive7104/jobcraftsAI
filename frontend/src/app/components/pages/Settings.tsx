@@ -276,6 +276,11 @@ export function Settings() {
                           <p className="text-xs text-muted-foreground whitespace-nowrap">
                             {new Date(payment.created_at).toLocaleString()}
                           </p>
+                          {payment.status === 'pending' && (
+                            <Link to={`/pricing?reference=${encodeURIComponent(payment.reference)}`}>
+                              <Button variant="outline" size="sm">Verify payment</Button>
+                            </Link>
+                          )}
                         </div>
                       </div>
                     ))

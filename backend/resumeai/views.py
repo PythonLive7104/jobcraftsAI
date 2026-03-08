@@ -1,9 +1,14 @@
+import hmac
+import hashlib
 import json
+import logging
 from datetime import timedelta
 import os
 import uuid
 
 from django.db.models import Avg
+from django.utils.decorators import method_decorator
+from django.views.decorators.csrf import csrf_exempt
 from rest_framework import serializers, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -291,7 +296,26 @@ class PaymentVerifyAPI(APIView):
             transaction.status = PaymentStatus.FAILED
             transaction.raw_response = body
             transaction.save(update_fields=["status", "raw_response", "updated_at"])
-            return Response({"error": "Payment verification failed validation checks."}, status=400)
+            reasons = []
+            if not paid:
+                reasons.append("payment not confirmed as success")
+            if not amount_ok:
+                reasons.append(f"amount mismatch (expected {transaction.amount_cents}, got {data.get('amount')})")
+            if not currency_ok:
+                reasons.append(f"currency mismatch (expected {transaction.currency}, got {data.get('currency')})")
+            if not plan_ok:
+                reasons.append(f"plan mismatch (expected {transaction.plan}, got {metadata.get('plan')})")
+            logger.warning(
+                "PaymentVerifyAPI validation failed ref=%s user=%s reasons=%s",
+                reference, request.user.id, reasons,
+            )
+            return Response(
+                {
+                    "error": "Payment verification failed validation checks.",
+                    "details": "; ".join(reasons),
+                },
+                status=400,
+            )
 
         transaction.status = PaymentStatus.SUCCESS
         transaction.raw_response = body
@@ -335,6 +359,114 @@ class PaymentVerifyAPI(APIView):
                 "message": f"Payment verified. Your plan is now {sub.get_plan_display()}.",
             }
         )
+
+
+logger = logging.getLogger(__name__)
+
+
+def _apply_payment_success(transaction: PaymentTransaction) -> bool:
+    """Apply successful payment to user subscription. Returns True if applied."""
+    if transaction.status == PaymentStatus.SUCCESS:
+        return True  # Already applied
+    metadata = {}
+    if transaction.raw_response:
+        data = (transaction.raw_response or {}).get("data") or {}
+        metadata = data.get("metadata") if isinstance(data.get("metadata"), dict) else {}
+    purchase_type = str(metadata.get("purchase_type", "plan_upgrade")).strip().lower()
+
+    if purchase_type == "credits":
+        def _int_env(name: str, default: int) -> int:
+            raw = os.getenv(name, "").strip()
+            if not raw:
+                return default
+            try:
+                return int(raw) if int(raw) > 0 else default
+            except ValueError:
+                return default
+
+        credits_per_pack = _int_env("ATS_CREDITS_PER_PACK", 30)
+        sub, _ = UserSubscription.objects.get_or_create(user=transaction.user)
+        sub.reset_if_new_month()
+        sub.ats_bonus_credits += credits_per_pack
+        sub.save(update_fields=["ats_bonus_credits"])
+    else:
+        sub, _ = UserSubscription.objects.get_or_create(user=transaction.user)
+        sub.plan = transaction.plan
+        sub.period_start = timezone.now().date()
+        sub.save(update_fields=["plan", "period_start"])
+
+    transaction.status = PaymentStatus.SUCCESS
+    transaction.save(update_fields=["status", "updated_at"])
+    return True
+
+
+@method_decorator(csrf_exempt, name="dispatch")
+class PaymentWebhookAPI(APIView):
+    """Paystack webhook: updates plan when charge.success is received (server-side, reliable)."""
+    permission_classes = [AllowAny]
+    authentication_classes = []  # No auth - Paystack calls this
+
+    def post(self, request):
+        raw_body = request.body
+        signature = (request.headers.get("x-paystack-signature") or "").strip()
+        paystack_secret = os.getenv("PAYSTACK_SECRET_KEY", "").strip()
+        if not paystack_secret:
+            logger.warning("PaymentWebhookAPI: PAYSTACK_SECRET_KEY not configured")
+            return Response({"status": "ok"}, status=200)
+
+        computed = hmac.new(
+            paystack_secret.encode(),
+            raw_body,
+            hashlib.sha512,
+        ).hexdigest()
+        if not hmac.compare_digest(computed, signature):
+            logger.warning("PaymentWebhookAPI: invalid signature")
+            return Response({"status": "unauthorized"}, status=401)
+
+        try:
+            body = json.loads(raw_body.decode("utf-8"))
+        except (json.JSONDecodeError, UnicodeDecodeError) as e:
+            logger.warning("PaymentWebhookAPI: invalid JSON body: %s", e)
+            return Response({"status": "ok"}, status=200)
+
+        event = (body.get("event") or "").strip().lower()
+        if event != "charge.success":
+            return Response({"status": "ok"}, status=200)
+
+        data = body.get("data") or {}
+        reference = str(data.get("reference") or "").strip()
+        if not reference:
+            logger.warning("PaymentWebhookAPI: charge.success missing reference")
+            return Response({"status": "ok"}, status=200)
+
+        transaction = PaymentTransaction.objects.filter(reference=reference).first()
+        if not transaction:
+            logger.warning("PaymentWebhookAPI: transaction not found for reference=%s", reference)
+            return Response({"status": "ok"}, status=200)
+
+        transaction.raw_response = body
+        transaction.save(update_fields=["raw_response", "updated_at"])
+
+        metadata = data.get("metadata") if isinstance(data.get("metadata"), dict) else {}
+        purchase_type = str(metadata.get("purchase_type", "plan_upgrade")).strip().lower()
+        plan = str(metadata.get("plan", transaction.plan)).strip().lower()
+        amount = int(data.get("amount") or 0)
+        currency = str(data.get("currency") or "").upper()
+
+        amount_ok = amount == transaction.amount_cents
+        currency_ok = currency == str(transaction.currency).upper()
+        plan_ok = purchase_type == "credits" or plan == transaction.plan
+
+        if not (amount_ok and currency_ok and plan_ok):
+            logger.warning(
+                "PaymentWebhookAPI: validation failed ref=%s amount_ok=%s currency_ok=%s plan_ok=%s",
+                reference, amount_ok, currency_ok, plan_ok,
+            )
+            return Response({"status": "ok"}, status=200)
+
+        _apply_payment_success(transaction)
+        logger.info("PaymentWebhookAPI: applied plan=%s for user=%s ref=%s", transaction.plan, transaction.user_id, reference)
+        return Response({"status": "ok"}, status=200)
 
 
 class PaymentHistoryAPI(APIView):
