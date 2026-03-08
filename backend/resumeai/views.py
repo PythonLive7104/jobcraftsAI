@@ -31,6 +31,7 @@ from .serializers import (
     ResumeUploadSerializer, ResumeDetailSerializer, ResumeListSerializer,
     JobAnalysisSerializer, ResumeVersionSerializer, SubscriptionSerializer, CareerGapAnalysisSerializer
 )
+from accounts.permissions import IsEmailVerified
 from .permissions import HasFeatureAccess
 from .utils import extract_text_from_pdf, extract_text_from_docx
 from .ai import (
@@ -52,10 +53,18 @@ class ContactMessageSerializer(serializers.Serializer):
 
 class MeAPI(APIView):
     permission_classes = [IsAuthenticated]
+
     def get(self, request):
+        from accounts.models import UserProfile
         sub, _ = UserSubscription.objects.get_or_create(user=request.user)
+        profile = UserProfile.get_or_create_profile(request.user)
         return Response({
-            "user": {"id": request.user.id, "email": request.user.email, "username": request.user.get_username()},
+            "user": {
+                "id": request.user.id,
+                "email": request.user.email,
+                "username": request.user.get_username(),
+                "email_verified": profile.email_verified,
+            },
             "subscription": SubscriptionSerializer(sub).data
         })
 
@@ -98,7 +107,7 @@ class ContactUsAPI(APIView):
 
 
 class PaymentInitializeAPI(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsEmailVerified]
 
     def post(self, request):
         def _int_env(name: str, default: int) -> int:
@@ -456,7 +465,7 @@ class DashboardSummaryAPI(APIView):
 
 
 class ResumeUploadAPI(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsEmailVerified]
 
     def post(self, request):
         sub, _ = UserSubscription.objects.get_or_create(user=request.user)
@@ -532,7 +541,7 @@ class ResumeDetailAPI(APIView):
 
 
 class JobAnalysisAPI(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsEmailVerified]
 
     def post(self, request, resume_id):
         resume = get_object_or_404(Resume, id=resume_id, user=request.user)
@@ -571,7 +580,7 @@ class JobAnalysisAPI(APIView):
 
 
 class ATSOptimizeAPI(APIView):
-    permission_classes = [IsAuthenticated, HasFeatureAccess.with_feature(Feature.ATS_OPTIMIZE)]
+    permission_classes = [IsAuthenticated, IsEmailVerified, HasFeatureAccess.with_feature(Feature.ATS_OPTIMIZE)]
 
     def post(self, request, resume_id):
         resume = get_object_or_404(Resume, id=resume_id, user=request.user)
@@ -629,7 +638,7 @@ class ATSOptimizeAPI(APIView):
 
 
 class LinkedInOptimizeAPI(APIView):
-    permission_classes = [IsAuthenticated, HasFeatureAccess.with_feature(Feature.LINKEDIN)]
+    permission_classes = [IsAuthenticated, IsEmailVerified, HasFeatureAccess.with_feature(Feature.LINKEDIN)]
 
     def post(self, request):
         target_role = request.data.get("target_role", "").strip()
@@ -675,7 +684,7 @@ class LinkedInOptimizeAPI(APIView):
 
 
 class CoverLetterAPI(APIView):
-    permission_classes = [IsAuthenticated, HasFeatureAccess.with_feature(Feature.COVER_LETTER)]
+    permission_classes = [IsAuthenticated, IsEmailVerified, HasFeatureAccess.with_feature(Feature.COVER_LETTER)]
 
     def post(self, request, resume_id):
         resume = get_object_or_404(Resume, id=resume_id, user=request.user)
@@ -736,7 +745,7 @@ class CoverLetterAPI(APIView):
 
 
 class InterviewPrepAPI(APIView):
-    permission_classes = [IsAuthenticated, HasFeatureAccess.with_feature(Feature.INTERVIEW_PREP)]
+    permission_classes = [IsAuthenticated, IsEmailVerified, HasFeatureAccess.with_feature(Feature.INTERVIEW_PREP)]
 
     def post(self, request, resume_id):
         resume = get_object_or_404(Resume, id=resume_id, user=request.user)
@@ -793,7 +802,7 @@ class InterviewPrepAPI(APIView):
 
 
 class CareerGapAPI(APIView):
-    permission_classes = [IsAuthenticated, HasFeatureAccess.with_feature(Feature.CAREER_GAP)]
+    permission_classes = [IsAuthenticated, IsEmailVerified, HasFeatureAccess.with_feature(Feature.CAREER_GAP)]
 
     def post(self, request):
         target_role = request.data.get("target_role", "").strip()

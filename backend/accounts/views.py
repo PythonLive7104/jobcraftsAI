@@ -3,6 +3,7 @@ import os
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.tokens import default_token_generator
+from django.http import HttpResponseRedirect
 from django.utils.encoding import force_bytes, force_str
 from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
 from rest_framework import permissions, status
@@ -11,6 +12,7 @@ from rest_framework.views import APIView
 from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework_simplejwt.tokens import RefreshToken
 
+from .models import UserProfile
 from .serializers import (
     ForgotPasswordRequestSerializer,
     PublicTokenObtainPairSerializer,
@@ -38,13 +40,19 @@ class RegisterView(APIView):
         serializer = RegisterSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         user = serializer.save()
-        refresh = RefreshToken.for_user(user)
+        profile = UserProfile.get_or_create_profile(user)
+        profile.generate_verification_token()
+        frontend_base = os.getenv("FRONTEND_BASE_URL", "http://127.0.0.1:5173").rstrip("/")
+        uid = urlsafe_base64_encode(force_bytes(user.pk))
+        verification_link = f"{frontend_base}/verify-email?uid={uid}&token={profile.verification_token}"
         ok, err = send_welcome_email(
             email=user.email,
             username=user.get_full_name() or user.username,
+            verification_link=verification_link,
         )
         if not ok:
             logger.warning("Welcome email failed for user %s: %s", user.id, err)
+        refresh = RefreshToken.for_user(user)
         return Response(
             {
                 "user": UserSerializer(user).data,
@@ -118,6 +126,76 @@ class ForgotPasswordView(APIView):
             {"detail": "If an account exists with that email, a reset link has been sent."},
             status=status.HTTP_200_OK,
         )
+
+
+class ResendVerificationEmailView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        profile = UserProfile.get_or_create_profile(request.user)
+        if profile.email_verified:
+            return Response({"detail": "Email is already verified."}, status=status.HTTP_400_BAD_REQUEST)
+        profile.generate_verification_token()
+        frontend_base = os.getenv("FRONTEND_BASE_URL", "http://127.0.0.1:5173").rstrip("/")
+        uid = urlsafe_base64_encode(force_bytes(request.user.pk))
+        verification_link = f"{frontend_base}/verify-email?uid={uid}&token={profile.verification_token}"
+        ok, err = send_welcome_email(
+            email=request.user.email,
+            username=request.user.get_full_name() or request.user.username,
+            verification_link=verification_link,
+        )
+        if not ok:
+            logger.warning("Resend verification email failed for user %s: %s", request.user.id, err)
+            return Response(
+                {"detail": "Failed to send verification email. Please try again later."},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+        return Response({"detail": "Verification email sent. Check your inbox."}, status=status.HTTP_200_OK)
+
+
+class VerifyEmailView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request):
+        """Handle direct link clicks from email - verify and redirect to frontend."""
+        uid = request.GET.get("uid", "").strip()
+        token = request.GET.get("token", "").strip()
+        frontend_base = os.getenv("FRONTEND_BASE_URL", "http://127.0.0.1:5173").rstrip("/")
+        success_url = f"{frontend_base}/verify-email?verified=1"
+        error_url = f"{frontend_base}/verify-email?verified=0&error=invalid"
+        if not uid or not token:
+            return HttpResponseRedirect(error_url)
+        try:
+            user_id = force_str(urlsafe_base64_decode(uid))
+            user = User.objects.get(pk=user_id)
+        except Exception:
+            return HttpResponseRedirect(error_url)
+        profile = UserProfile.get_or_create_profile(user)
+        if profile.verification_token and profile.verification_token == token:
+            profile.email_verified = True
+            profile.verification_token = ""
+            profile.save(update_fields=["email_verified", "verification_token"])
+            return HttpResponseRedirect(success_url)
+        return HttpResponseRedirect(error_url)
+
+    def post(self, request):
+        """API call from frontend - verify and return JSON."""
+        uid = (request.data.get("uid") or "").strip()
+        token = (request.data.get("token") or "").strip()
+        if not uid or not token:
+            return Response({"detail": "Missing uid or token."}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            user_id = force_str(urlsafe_base64_decode(uid))
+            user = User.objects.get(pk=user_id)
+        except Exception:
+            return Response({"detail": "Invalid verification link."}, status=status.HTTP_400_BAD_REQUEST)
+        profile = UserProfile.get_or_create_profile(user)
+        if not profile.verification_token or profile.verification_token != token:
+            return Response({"detail": "Verification link is invalid or expired."}, status=status.HTTP_400_BAD_REQUEST)
+        profile.email_verified = True
+        profile.verification_token = ""
+        profile.save(update_fields=["email_verified", "verification_token"])
+        return Response({"detail": "Email verified successfully."}, status=status.HTTP_200_OK)
 
 
 class ResetPasswordView(APIView):

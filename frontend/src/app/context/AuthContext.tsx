@@ -7,6 +7,7 @@ type AuthUser = {
   email: string;
   first_name: string;
   last_name: string;
+  email_verified?: boolean;
 };
 
 type RegisterPayload = {

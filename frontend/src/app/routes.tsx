@@ -17,6 +17,7 @@ import { Login } from "./components/pages/Login";
 import { Register } from "./components/pages/Register";
 import { ForgotPassword } from "./components/pages/ForgotPassword";
 import { ResetPassword } from "./components/pages/ResetPassword";
+import { VerifyEmail } from "./components/pages/VerifyEmail";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 
 export const router = createBrowserRouter([
@@ -30,6 +31,7 @@ export const router = createBrowserRouter([
       { path: "register", element: <Register /> },
       { path: "forgot-password", element: <ForgotPassword /> },
       { path: "reset-password", element: <ResetPassword /> },
+      { path: "verify-email", element: <VerifyEmail /> },
       {
         element: <ProtectedRoute />,
         children: [

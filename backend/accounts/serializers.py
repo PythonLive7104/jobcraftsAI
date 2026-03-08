@@ -29,9 +29,16 @@ class RegisterSerializer(serializers.ModelSerializer):
 
 
 class UserSerializer(serializers.ModelSerializer):
+    email_verified = serializers.SerializerMethodField()
+
     class Meta:
         model = User
-        fields = ("id", "username", "email", "first_name", "last_name")
+        fields = ("id", "username", "email", "first_name", "last_name", "email_verified")
+
+    def get_email_verified(self, obj):
+        from .models import UserProfile
+        profile = UserProfile.get_or_create_profile(obj)
+        return profile.email_verified
 
 
 class UserUpdateSerializer(serializers.ModelSerializer):

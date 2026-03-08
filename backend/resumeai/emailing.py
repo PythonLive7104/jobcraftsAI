@@ -40,22 +40,44 @@ def send_email_via_resend(
     return True, None
 
 
-def send_welcome_email(*, email: str, username: str) -> Tuple[bool, Optional[str]]:
+def send_welcome_email(
+    *,
+    email: str,
+    username: str,
+    verification_link: Optional[str] = None,
+) -> Tuple[bool, Optional[str]]:
     safe_name = username or "there"
-    subject = "Welcome to JobCrafts AI"
-    html = f"""
-    <div style="font-family:Arial,sans-serif;line-height:1.5;color:#111;">
-      <h2 style="margin:0 0 12px;">Welcome to JobCrafts AI, {safe_name}!</h2>
-      <p style="margin:0 0 10px;">Your account has been created successfully.</p>
-      <p style="margin:0 0 10px;">
-        You can now upload your resume, run ATS optimizations, generate cover letters,
-        and prepare for interviews with AI.
-      </p>
-      <p style="margin:0;">We are glad to have you onboard.</p>
-    </div>
-    """.strip()
-    text = (
-        f"Welcome to JobCrafts AI, {safe_name}! "
-        "Your account has been created successfully."
-    )
+    subject = "Welcome to JobCrafts AI – Confirm your email"
+    if verification_link:
+        html = f"""
+        <div style="font-family:Arial,sans-serif;line-height:1.5;color:#111;">
+          <h2 style="margin:0 0 12px;">Welcome to JobCrafts AI, {safe_name}!</h2>
+          <p style="margin:0 0 10px;">Your account has been created. Please confirm your email to start using all features.</p>
+          <p style="margin:0 0 16px;">
+            <a href="{verification_link}" style="background:#4f46e5;color:#fff;padding:10px 14px;border-radius:8px;text-decoration:none;">
+              Confirm Email
+            </a>
+          </p>
+          <p style="margin:0 0 8px;">Or copy and paste this link into your browser:</p>
+          <p style="margin:0;color:#4f46e5;word-break:break-all;">{verification_link}</p>
+          <p style="margin:16px 0 0;">Until you confirm, you won't be able to upload resumes or use optimization features.</p>
+        </div>
+        """.strip()
+        text = f"Welcome to JobCrafts AI, {safe_name}! Confirm your email: {verification_link}"
+    else:
+        html = f"""
+        <div style="font-family:Arial,sans-serif;line-height:1.5;color:#111;">
+          <h2 style="margin:0 0 12px;">Welcome to JobCrafts AI, {safe_name}!</h2>
+          <p style="margin:0 0 10px;">Your account has been created successfully.</p>
+          <p style="margin:0 0 10px;">
+            You can now upload your resume, run ATS optimizations, generate cover letters,
+            and prepare for interviews with AI.
+          </p>
+          <p style="margin:0;">We are glad to have you onboard.</p>
+        </div>
+        """.strip()
+        text = (
+            f"Welcome to JobCrafts AI, {safe_name}! "
+            "Your account has been created successfully."
+        )
     return send_email_via_resend(to_email=email, subject=subject, html=html, text=text)
