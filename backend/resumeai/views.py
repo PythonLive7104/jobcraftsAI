@@ -468,6 +468,18 @@ class ResumeUploadAPI(APIView):
     permission_classes = [IsAuthenticated, IsEmailVerified]
 
     def post(self, request):
+        import logging
+        logger = logging.getLogger(__name__)
+        try:
+            return self._do_upload(request)
+        except Exception as exc:
+            logger.exception("Resume upload failed: %s", exc)
+            return Response(
+                {"error": str(exc), "detail": "Resume upload failed. Please try again."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+    def _do_upload(self, request):
         sub, _ = UserSubscription.objects.get_or_create(user=request.user)
         sub.reset_if_new_month()
         resume_limit = sub.limit_for(Feature.RESUME_UPLOAD)
@@ -498,11 +510,18 @@ class ResumeUploadAPI(APIView):
 
         # Sync parse for now (easy). Move to Celery later.
         try:
-            path = resume.original_file.path
-            if file_type == "pdf":
-                text = extract_text_from_pdf(path)
+            path = getattr(resume.original_file, "path", None)
+            if path:
+                if file_type == "pdf":
+                    text = extract_text_from_pdf(path)
+                else:
+                    text = extract_text_from_docx(path)
             else:
-                text = extract_text_from_docx(path)
+                with resume.original_file.open("rb") as fp:
+                    if file_type == "pdf":
+                        text = extract_text_from_pdf(fp)
+                    else:
+                        text = extract_text_from_docx(fp)
 
             resume.extracted_text = text
             resume.parse_status = "done"
