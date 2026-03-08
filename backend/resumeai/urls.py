@@ -15,6 +15,9 @@ from .views import (
     PaymentHistoryAPI,
     PaymentVerifyAPI,
     MeAPI,
+    PortfolioAPI,
+    PortfolioPublicAPI,
+    PortfolioResumeDownloadAPI,
     ResumeListAPI,
     ResumeDetailAPI,
     ResumeUploadAPI,
@@ -42,4 +45,7 @@ urlpatterns = [
     path("career-gap/history/<uuid:analysis_id>/", CareerGapHistoryDetailAPI.as_view()),
     path("resumes/<uuid:resume_id>/versions/", ResumeVersionsListAPI.as_view()),
     path("versions/<uuid:version_id>/", ResumeVersionDetailAPI.as_view()),
+    path("portfolio/", PortfolioAPI.as_view()),
+    path("portfolio/public/<slug:slug>/", PortfolioPublicAPI.as_view()),
+    path("portfolio/public/<slug:slug>/resume/", PortfolioResumeDownloadAPI.as_view()),
 ]

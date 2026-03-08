@@ -16,6 +16,7 @@ import requests
 from .models import (
     ContactMessage,
     CareerGapAnalysis,
+    Portfolio,
     Resume,
     ResumeVersion,
     JobAnalysis,
@@ -29,10 +30,11 @@ from .models import (
 )
 from .serializers import (
     ResumeUploadSerializer, ResumeDetailSerializer, ResumeListSerializer,
-    JobAnalysisSerializer, ResumeVersionSerializer, SubscriptionSerializer, CareerGapAnalysisSerializer
+    JobAnalysisSerializer, ResumeVersionSerializer, SubscriptionSerializer, CareerGapAnalysisSerializer,
+    PortfolioSerializer,
 )
 from accounts.permissions import IsEmailVerified
-from .permissions import HasFeatureAccess
+from .permissions import HasFeatureAccess, HasProPlan
 from .utils import extract_text_from_pdf, extract_text_from_docx
 from .ai import (
     analyze_job_description_with_gpt5,
@@ -445,6 +447,9 @@ class DashboardSummaryAPI(APIView):
             for item in activity_events[:5]
         ]
 
+        portfolio = Portfolio.objects.filter(user=user).first()
+        base_url = os.getenv("FRONTEND_BASE_URL", "http://127.0.0.1:5173").rstrip("/")
+
         return Response(
             {
                 "stats": {
@@ -458,6 +463,11 @@ class DashboardSummaryAPI(APIView):
                     "ats_used": ats_used,
                     "ats_limit": ats_limit,
                     "ats_remaining": credits_left,
+                    "is_pro": sub.plan == Plan.PRO,
+                },
+                "portfolio": {
+                    "has_portfolio": portfolio is not None,
+                    "share_url": f"{base_url}/p/{portfolio.slug}" if portfolio else None,
                 },
                 "recent_activity": recent_activity,
             }
@@ -925,3 +935,90 @@ class ResumeVersionDetailAPI(APIView):
     def get(self, request, version_id):
         v = get_object_or_404(ResumeVersion, id=version_id, resume__user=request.user)
         return Response(ResumeVersionSerializer(v).data)
+
+
+def _generate_portfolio_slug(user) -> str:
+    import re
+    import secrets
+    base = re.sub(r"[^a-z0-9]+", "-", (user.username or user.email or "user").lower()).strip("-") or "portfolio"
+    base = base[:50]
+    for _ in range(10):
+        slug = f"{base}-{secrets.token_hex(3)}" if base else secrets.token_hex(4)
+        if not Portfolio.objects.filter(slug=slug).exists():
+            return slug
+    return f"{base}-{uuid.uuid4().hex[:8]}"
+
+
+class PortfolioAPI(APIView):
+    permission_classes = [IsAuthenticated, IsEmailVerified, HasProPlan]
+
+    def get(self, request):
+        portfolio = Portfolio.objects.filter(user=request.user).first()
+        if not portfolio:
+            return Response({"detail": "No portfolio yet. Create one below."}, status=status.HTTP_404_NOT_FOUND)
+        data = PortfolioSerializer(portfolio).data
+        base_url = os.getenv("FRONTEND_BASE_URL", "http://127.0.0.1:5173").rstrip("/")
+        data["share_url"] = f"{base_url}/p/{portfolio.slug}"
+        return Response(data)
+
+    def put(self, request):
+        portfolio = Portfolio.objects.filter(user=request.user).first()
+        serializer = PortfolioSerializer(
+            instance=portfolio,
+            data=request.data,
+            partial=portfolio is not None,
+            context={"request": request},
+        )
+        serializer.is_valid(raise_exception=True)
+        if portfolio:
+            serializer.save()
+        else:
+            slug = (request.data.get("slug") or "").strip() or _generate_portfolio_slug(request.user)
+            if Portfolio.objects.filter(slug=slug).exists():
+                slug = _generate_portfolio_slug(request.user)
+            portfolio = serializer.save(user=request.user, slug=slug)
+        data = PortfolioSerializer(portfolio).data
+        base_url = os.getenv("FRONTEND_BASE_URL", "http://127.0.0.1:5173").rstrip("/")
+        data["share_url"] = f"{base_url}/p/{portfolio.slug}"
+        return Response(data, status=status.HTTP_200_OK)
+
+
+class PortfolioPublicAPI(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request, slug):
+        portfolio = get_object_or_404(Portfolio, slug=slug)
+        data = {
+            "name": portfolio.name,
+            "title": portfolio.title,
+            "location": portfolio.location,
+            "short_summary": portfolio.short_summary,
+            "experience": portfolio.experience,
+            "projects": portfolio.projects,
+            "skills": portfolio.skills,
+            "email": portfolio.email,
+            "linkedin_url": portfolio.linkedin_url,
+            "github_url": portfolio.github_url,
+            "has_resume": bool(portfolio.resume_id),
+        }
+        if portfolio.resume_id:
+            data["resume_download_url"] = f"/api/portfolio/public/{slug}/resume/"
+        return Response(data)
+
+
+class PortfolioResumeDownloadAPI(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request, slug):
+        from django.http import FileResponse
+        portfolio = get_object_or_404(Portfolio, slug=slug)
+        if not portfolio.resume_id:
+            return Response({"error": "No resume attached."}, status=status.HTTP_404_NOT_FOUND)
+        resume = portfolio.resume
+        if not resume.original_file:
+            return Response({"error": "Resume file not found."}, status=status.HTTP_404_NOT_FOUND)
+        try:
+            f = resume.original_file.open("rb")
+            return FileResponse(f, as_attachment=True, filename=resume.filename or "resume.pdf")
+        except Exception:
+            return Response({"error": "Resume file not found."}, status=status.HTTP_404_NOT_FOUND)

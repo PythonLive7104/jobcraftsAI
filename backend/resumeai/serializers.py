@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from .models import CareerGapAnalysis, Feature, JobAnalysis, Resume, ResumeVersion, UserSubscription
+from .models import CareerGapAnalysis, Feature, JobAnalysis, Portfolio, Resume, ResumeVersion, UserSubscription
 
 
 class SubscriptionSerializer(serializers.ModelSerializer):
@@ -88,3 +88,65 @@ class CareerGapAnalysisSerializer(serializers.ModelSerializer):
             "created_at",
         ]
         read_only_fields = ["id", "created_at"]
+
+
+class PortfolioSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Portfolio
+        fields = [
+            "id",
+            "slug",
+            "name",
+            "title",
+            "location",
+            "short_summary",
+            "experience",
+            "projects",
+            "skills",
+            "resume",
+            "email",
+            "linkedin_url",
+            "github_url",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = ["id", "slug", "created_at", "updated_at"]
+
+    def validate_resume(self, value):
+        if value is None:
+            return value
+        request = self.context.get("request")
+        if request and value.user_id != request.user.id:
+            raise serializers.ValidationError("Resume must belong to you.")
+        return value
+
+    def validate_experience(self, value):
+        if not isinstance(value, list):
+            return []
+        out = []
+        for item in value[:20]:
+            if not isinstance(item, dict):
+                continue
+            job_role = str(item.get("job_role", "")).strip()
+            achievements = item.get("achievements", [])
+            if isinstance(achievements, list):
+                achievements = [str(a).strip() for a in achievements[:15] if str(a).strip()]
+            out.append({"job_role": job_role, "achievements": achievements})
+        return out
+
+    def validate_projects(self, value):
+        if not isinstance(value, list):
+            return []
+        out = []
+        for item in value[:15]:
+            if not isinstance(item, dict):
+                continue
+            desc = str(item.get("description", "")).strip()
+            link = str(item.get("link", "")).strip()
+            out.append({"description": desc, "link": link})
+        return out
+
+    def validate_skills(self, value):
+        if not isinstance(value, list):
+            return []
+        return [str(s).strip() for s in value[:50] if str(s).strip()]

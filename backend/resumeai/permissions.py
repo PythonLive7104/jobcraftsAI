@@ -1,6 +1,19 @@
 from rest_framework.permissions import BasePermission
 
-from .models import UserSubscription
+from .models import Plan, UserSubscription
+
+
+class HasProPlan(BasePermission):
+    """Allow access only for Pro subscribers."""
+
+    message = "Portfolio is a Pro feature. Upgrade to Pro to create your portfolio."
+
+    def has_permission(self, request, view):
+        if not request.user or not request.user.is_authenticated:
+            return False
+        sub, _ = UserSubscription.objects.get_or_create(user=request.user)
+        sub.reset_if_new_month()
+        return sub.plan == Plan.PRO
 
 
 class HasFeatureAccess(BasePermission):

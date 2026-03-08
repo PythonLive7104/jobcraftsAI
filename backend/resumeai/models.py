@@ -350,3 +350,49 @@ class ContactMessage(models.Model):
 
     def __str__(self):
         return f"{self.name} <{self.email}>"
+
+
+class Portfolio(models.Model):
+    """Pro-only shareable portfolio page for recruiters."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="portfolio",
+    )
+    slug = models.SlugField(max_length=80, unique=True, db_index=True)
+    name = models.CharField(max_length=120)
+    title = models.CharField(max_length=180, blank=True)
+    location = models.CharField(max_length=120, blank=True)
+    short_summary = models.TextField(blank=True)
+    experience = models.JSONField(
+        default=list,
+        help_text="[{job_role, achievements: [str]}]",
+    )
+    projects = models.JSONField(
+        default=list,
+        help_text="[{description, link}]",
+    )
+    skills = models.JSONField(
+        default=list,
+        help_text="[str]",
+    )
+    resume = models.ForeignKey(
+        Resume,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="portfolios_using",
+    )
+    email = models.EmailField(blank=True)
+    linkedin_url = models.URLField(blank=True)
+    github_url = models.URLField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-updated_at"]
+
+    def __str__(self):
+        return f"Portfolio: {self.name} ({self.slug})"
