@@ -563,9 +563,21 @@ class JobAnalysisAPI(APIView):
     permission_classes = [IsAuthenticated, IsEmailVerified]
 
     def post(self, request, resume_id):
+        import logging
+        logger = logging.getLogger(__name__)
+        try:
+            return self._do_analyze(request, resume_id)
+        except Exception as exc:
+            logger.exception("Job analysis failed: %s", exc)
+            return Response(
+                {"error": str(exc), "detail": "Job analysis failed. Please try again."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+    def _do_analyze(self, request, resume_id):
         resume = get_object_or_404(Resume, id=resume_id, user=request.user)
-        job_description = request.data.get("job_description", "").strip()
-        job_title = request.data.get("job_title", "").strip()
+        job_description = (request.data.get("job_description") or "").strip()
+        job_title = (request.data.get("job_title") or "").strip()
 
         if not job_description:
             return Response({"error": "job_description is required"}, status=400)
@@ -574,7 +586,7 @@ class JobAnalysisAPI(APIView):
 
         try:
             gpt_result = analyze_job_description_with_gpt5(
-                resume_text=resume.extracted_text,
+                resume_text=resume.extracted_text or "",
                 job_description=job_description,
                 job_title=job_title,
             )
@@ -588,12 +600,19 @@ class JobAnalysisAPI(APIView):
         except json.JSONDecodeError:
             return Response({"error": "GPT analysis failed: invalid JSON response."}, status=502)
 
+        keywords = gpt_result.get("keywords") or {}
+        match_data = gpt_result.get("match") or {}
+        if not isinstance(keywords, dict):
+            keywords = {}
+        if not isinstance(match_data, dict):
+            match_data = {}
+
         analysis = JobAnalysis.objects.create(
             resume=resume,
-            job_title=job_title,
+            job_title=job_title[:120] if job_title else "",
             job_description=job_description,
-            keywords=gpt_result["keywords"],
-            match=gpt_result["match"],
+            keywords=keywords,
+            match=match_data,
         )
         return Response(JobAnalysisSerializer(analysis).data, status=201)
 

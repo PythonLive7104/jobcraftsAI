@@ -1,8 +1,18 @@
 import json
 import os
+import re
 from typing import Any
 
 from openai import OpenAI
+
+
+def _extract_json(raw: str) -> dict:
+    """Parse JSON from raw string, stripping markdown code blocks if present."""
+    raw = (raw or "").strip()
+    match = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", raw)
+    if match:
+        raw = match.group(1).strip()
+    return json.loads(raw)
 
 
 def _openai_client() -> OpenAI:
@@ -43,7 +53,7 @@ def analyze_job_description_with_gpt5(resume_text: str, job_description: str, jo
     if not raw:
         raise ValueError("Empty response from GPT model.")
 
-    result = json.loads(raw)
+    result = _extract_json(raw)
     keywords = result.get("keywords", {})
     match = result.get("match", {})
 
