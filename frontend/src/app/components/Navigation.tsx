@@ -1,5 +1,5 @@
 import { Link, NavLink, useLocation } from 'react-router';
-import { Moon, Sun, Sparkles, Menu, X } from 'lucide-react';
+import { Moon, Sun, Menu, X } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { Button } from './ui/button';
 import { useEffect, useState } from 'react';
@@ -30,9 +30,7 @@ export function Navigation() {
         <div className="flex justify-between items-center h-16">
           {/* Logo */}
           <Link to="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
-            <div className="w-8 h-8 bg-gradient-to-br from-indigo-500 to-cyan-500 rounded-lg flex items-center justify-center">
-              <Sparkles className="w-5 h-5 text-white" />
-            </div>
+            <img src="/logo.png" alt="JobCrafts AI" className="w-8 h-8 rounded-lg object-contain" />
             <span className="font-semibold text-lg">JobCrafts AI</span>
           </Link>
 

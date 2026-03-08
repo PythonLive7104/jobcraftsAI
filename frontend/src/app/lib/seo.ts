@@ -2,7 +2,7 @@ import { ROUTE_FAQS, SITE_URL } from "./seo-routes";
 
 type JsonLd = Record<string, unknown>;
 
-const DEFAULT_OG_IMAGE = `${SITE_URL}/favicon.svg`;
+const DEFAULT_OG_IMAGE = `${SITE_URL}/logo.png`;
 const SITE_NAME = "JobCrafts AI";
 
 type SeoConfig = {
@@ -36,7 +36,7 @@ const siteJsonLd: JsonLd[] = [
     "@type": "Organization",
     name: SITE_NAME,
     url: SITE_URL,
-    logo: `${SITE_URL}/favicon.svg`,
+    logo: `${SITE_URL}/logo.png`,
   },
   {
     "@context": "https://schema.org",
