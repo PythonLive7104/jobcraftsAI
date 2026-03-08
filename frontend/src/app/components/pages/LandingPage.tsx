@@ -21,9 +21,7 @@ import {
   Zap,
   Shield,
   Globe,
-  Instagram,
   Facebook,
-  Youtube
 } from 'lucide-react';
 
 export function LandingPage() {
@@ -33,10 +31,8 @@ export function LandingPage() {
   const [contactMessage, setContactMessage] = useState('');
   const [sendingContact, setSendingContact] = useState(false);
   const socialLinks = {
-    linkedin: '#',
-    instagram: '#',
-    facebook: '#',
-    youtube: '#',
+    linkedin: 'https://linkedin.com/company/jobcrafts-ai',
+    facebook: 'https://www.facebook.com/jobcraftsai/',
   };
   const features = [
     {
@@ -388,7 +384,7 @@ export function LandingPage() {
           <div>
             <h3 className="text-2xl font-semibold mb-4">Follow Us</h3>
             <p className="text-sm text-muted-foreground mb-4">
-              Social links are ready. We will plug in your real URLs when you share them.
+              Stay connected for tips, updates, and career insights.
             </p>
             <div className="flex items-center gap-3">
               <a
@@ -401,15 +397,6 @@ export function LandingPage() {
                 <Linkedin className="w-5 h-5" />
               </a>
               <a
-                href={socialLinks.instagram}
-                className="w-10 h-10 rounded-full border border-border flex items-center justify-center hover:bg-muted transition-colors"
-                aria-label="Instagram"
-                target="_blank"
-                rel="noreferrer"
-              >
-                <Instagram className="w-5 h-5" />
-              </a>
-              <a
                 href={socialLinks.facebook}
                 className="w-10 h-10 rounded-full border border-border flex items-center justify-center hover:bg-muted transition-colors"
                 aria-label="Facebook"
@@ -417,15 +404,6 @@ export function LandingPage() {
                 rel="noreferrer"
               >
                 <Facebook className="w-5 h-5" />
-              </a>
-              <a
-                href={socialLinks.youtube}
-                className="w-10 h-10 rounded-full border border-border flex items-center justify-center hover:bg-muted transition-colors"
-                aria-label="YouTube"
-                target="_blank"
-                rel="noreferrer"
-              >
-                <Youtube className="w-5 h-5" />
               </a>
             </div>
           </div>
