@@ -153,7 +153,7 @@ class PaymentInitializeAPI(APIView):
         paystack_base_url = os.getenv("PAYSTACK_BASE_URL", "https://api.paystack.co").rstrip("/")
 
         frontend_base_url = os.getenv("FRONTEND_BASE_URL", "http://127.0.0.1:5173").rstrip("/")
-        reference = f"resumeai-{request.user.id}-{uuid.uuid4().hex[:18]}"
+        reference = f"jobcraftsai-{request.user.id}-{uuid.uuid4().hex[:18]}"
         amount_cents = _int_env("PAYSTACK_CREDIT_AMOUNT_MINOR", credit_default) if is_credit_purchase else plan_prices[requested_plan]
         transaction_plan = Plan.FREE if is_credit_purchase else requested_plan
         email = (request.user.email or "").strip()
@@ -350,7 +350,18 @@ class PaymentVerifyAPI(APIView):
         sub, _ = UserSubscription.objects.get_or_create(user=request.user)
         sub.plan = transaction.plan
         sub.period_start = timezone.now().date()
-        sub.save(update_fields=["plan", "period_start"])
+        sub.ats_uses = 0
+        sub.cover_letter_uses = 0
+        sub.interview_prep_uses = 0
+        sub.linkedin_uses = 0
+        sub.career_gap_uses = 0
+        sub.save(
+            update_fields=[
+                "plan", "period_start",
+                "ats_uses", "cover_letter_uses", "interview_prep_uses",
+                "linkedin_uses", "career_gap_uses",
+            ]
+        )
 
         return Response(
             {
@@ -393,7 +404,18 @@ def _apply_payment_success(transaction: PaymentTransaction) -> bool:
         sub, _ = UserSubscription.objects.get_or_create(user=transaction.user)
         sub.plan = transaction.plan
         sub.period_start = timezone.now().date()
-        sub.save(update_fields=["plan", "period_start"])
+        sub.ats_uses = 0
+        sub.cover_letter_uses = 0
+        sub.interview_prep_uses = 0
+        sub.linkedin_uses = 0
+        sub.career_gap_uses = 0
+        sub.save(
+            update_fields=[
+                "plan", "period_start",
+                "ats_uses", "cover_letter_uses", "interview_prep_uses",
+                "linkedin_uses", "career_gap_uses",
+            ]
+        )
 
     transaction.status = PaymentStatus.SUCCESS
     transaction.save(update_fields=["status", "updated_at"])

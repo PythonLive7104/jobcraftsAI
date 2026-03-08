@@ -269,7 +269,9 @@ export function Settings() {
                           <p className="font-medium">
                             {payment.currency} {payment.amount_major} - {payment.plan.toUpperCase()}
                           </p>
-                          <p className="text-xs text-muted-foreground truncate">{payment.reference}</p>
+                          <p className="text-xs text-muted-foreground truncate">
+                            {payment.reference.replace(/^resumeai-/, 'jobcraftsai-')}
+                          </p>
                         </div>
                         <div className="flex items-center gap-3">
                           <Badge className={getStatusClassName(payment.status)}>{payment.status}</Badge>
