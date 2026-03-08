@@ -22,8 +22,20 @@ def _openai_client() -> OpenAI:
     return OpenAI(api_key=api_key)
 
 
+def _chat_completion(client: OpenAI, model: str, prompt: str) -> str:
+    """Use Chat Completions API (widely supported). Fallback if Responses API fails."""
+    completion = client.chat.completions.create(
+        model=model,
+        messages=[{"role": "user", "content": prompt}],
+        temperature=0.3,
+    )
+    msg = completion.choices[0].message if completion.choices else None
+    raw = (msg.content or "").strip() if msg else ""
+    return raw
+
+
 def analyze_job_description_with_gpt5(resume_text: str, job_description: str, job_title: str = "") -> dict[str, Any]:
-    model = os.getenv("OPENAI_JOB_ANALYSIS_MODEL", "gpt-5")
+    model = os.getenv("OPENAI_JOB_ANALYSIS_MODEL", "gpt-4o")
     client = _openai_client()
 
     prompt = (
@@ -44,12 +56,7 @@ def analyze_job_description_with_gpt5(resume_text: str, job_description: str, jo
         f"Resume Text:\n{resume_text[:12000]}\n"
     )
 
-    response = client.responses.create(
-        model=model,
-        input=prompt,
-    )
-
-    raw = (getattr(response, "output_text", "") or "").strip()
+    raw = _chat_completion(client, model, prompt)
     if not raw:
         raise ValueError("Empty response from GPT model.")
 
@@ -88,7 +95,7 @@ def ats_optimize(
     target_role: str = "",
     job_title: str = "",
 ) -> dict[str, Any]:
-    model = os.getenv("OPENAI_ATS_OPTIMIZE_MODEL", "gpt-5")
+    model = os.getenv("OPENAI_ATS_OPTIMIZE_MODEL", "gpt-4o")
     client = _openai_client()
 
     prompt = (
@@ -123,16 +130,11 @@ def ats_optimize(
         f"Resume Text:\n{resume_text[:14000]}\n"
     )
 
-    response = client.responses.create(
-        model=model,
-        input=prompt,
-    )
-
-    raw = (getattr(response, "output_text", "") or "").strip()
+    raw = _chat_completion(client, model, prompt)
     if not raw:
         raise ValueError("Empty response from GPT model.")
 
-    result = json.loads(raw)
+    result = _extract_json(raw)
     if not isinstance(result, dict):
         raise ValueError("Invalid JSON structure from GPT model.")
 
@@ -178,7 +180,7 @@ def ats_optimize(
 
 
 def linkedin_optimize(target_role: str, headline: str, about: str, experience: str) -> dict[str, Any]:
-    model = os.getenv("OPENAI_LINKEDIN_OPTIMIZE_MODEL", "gpt-5")
+    model = os.getenv("OPENAI_LINKEDIN_OPTIMIZE_MODEL", "gpt-4o")
     client = _openai_client()
 
     prompt = (
@@ -203,15 +205,11 @@ def linkedin_optimize(target_role: str, headline: str, about: str, experience: s
         f"Current Experience:\n{experience or 'N/A'}\n"
     )
 
-    response = client.responses.create(
-        model=model,
-        input=prompt,
-    )
-    raw = (getattr(response, "output_text", "") or "").strip()
+    raw = _chat_completion(client, model, prompt)
     if not raw:
         raise ValueError("Empty response from GPT model.")
 
-    parsed = json.loads(raw)
+    parsed = _extract_json(raw)
     if not isinstance(parsed, dict):
         raise ValueError("Invalid JSON structure from GPT model.")
 
@@ -254,7 +252,7 @@ def linkedin_optimize(target_role: str, headline: str, about: str, experience: s
 
 
 def career_gap_analyze(target_role: str, gap_reason: str, gap_start: str, gap_end: str, what_you_did: str) -> dict[str, Any]:
-    model = os.getenv("OPENAI_CAREER_GAP_MODEL", "gpt-5")
+    model = os.getenv("OPENAI_CAREER_GAP_MODEL", "gpt-4o")
     client = _openai_client()
 
     prompt = (
@@ -294,15 +292,11 @@ def career_gap_analyze(target_role: str, gap_reason: str, gap_start: str, gap_en
         f"What User Did During Gap:\n{what_you_did or 'N/A'}\n"
     )
 
-    response = client.responses.create(
-        model=model,
-        input=prompt,
-    )
-    raw = (getattr(response, "output_text", "") or "").strip()
+    raw = _chat_completion(client, model, prompt)
     if not raw:
         raise ValueError("Empty response from GPT model.")
 
-    parsed = json.loads(raw)
+    parsed = _extract_json(raw)
     if not isinstance(parsed, dict):
         raise ValueError("Invalid JSON structure from GPT model.")
 
@@ -442,7 +436,7 @@ def generate_cover_letter_with_gpt5(
     tone: str = "professional",
     job_description: str = "",
 ) -> str:
-    model = os.getenv("OPENAI_COVER_LETTER_MODEL", "gpt-5")
+    model = os.getenv("OPENAI_COVER_LETTER_MODEL", "gpt-4o")
     client = _openai_client()
 
     prompt = (
@@ -465,11 +459,7 @@ def generate_cover_letter_with_gpt5(
         f"Resume Text:\n{resume_text[:12000]}\n"
     )
 
-    response = client.responses.create(
-        model=model,
-        input=prompt,
-    )
-    text = (getattr(response, "output_text", "") or "").strip()
+    text = _chat_completion(client, model, prompt)
     if not text:
         raise ValueError("Empty response from GPT model.")
     return text
@@ -480,7 +470,7 @@ def generate_interview_prep_with_gpt5(
     job_title: str,
     job_requirements: str = "",
 ) -> dict[str, Any]:
-    model = os.getenv("OPENAI_INTERVIEW_PREP_MODEL", "gpt-5")
+    model = os.getenv("OPENAI_INTERVIEW_PREP_MODEL", "gpt-4o")
     client = _openai_client()
 
     prompt = (
@@ -519,16 +509,11 @@ def generate_interview_prep_with_gpt5(
         f"Resume Text:\n{resume_text[:12000]}\n"
     )
 
-    response = client.responses.create(
-        model=model,
-        input=prompt,
-    )
-
-    raw = (getattr(response, "output_text", "") or "").strip()
+    raw = _chat_completion(client, model, prompt)
     if not raw:
         raise ValueError("Empty response from GPT model.")
 
-    parsed = json.loads(raw)
+    parsed = _extract_json(raw)
     categories_raw = parsed.get("categories", [])
     if not isinstance(categories_raw, list):
         raise ValueError("Invalid categories structure from GPT model.")
