@@ -19,7 +19,7 @@ from .serializers import (
     UserSerializer,
     UserUpdateSerializer,
 )
-from resumeai.emailing import send_email_via_resend
+from resumeai.emailing import send_email_via_resend, send_welcome_email
 
 
 User = get_user_model()
@@ -39,7 +39,12 @@ class RegisterView(APIView):
         serializer.is_valid(raise_exception=True)
         user = serializer.save()
         refresh = RefreshToken.for_user(user)
-        # Welcome email disabled for now; re-enable when Resend domain is verified
+        ok, err = send_welcome_email(
+            email=user.email,
+            username=user.get_full_name() or user.username,
+        )
+        if not ok:
+            logger.warning("Welcome email failed for user %s: %s", user.id, err)
         return Response(
             {
                 "user": UserSerializer(user).data,

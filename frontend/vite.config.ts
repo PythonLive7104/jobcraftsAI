@@ -19,7 +19,7 @@ export default defineConfig({
 
   server: {
     host: true,
-    allowedHosts: ['jobcraftsai.net', 'www.jobcraftsai.net'],
+    allowedHosts: ['frontend','jobcraftsai.net', 'www.jobcraftsai.net'],
   },
 
   // File types to support raw imports. Never add .css, .tsx, or .ts files to this.
