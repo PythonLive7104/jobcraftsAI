@@ -27,8 +27,8 @@ load_env_file()
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "django-insecure-change-me-in-production")
 DEBUG = os.getenv("DJANGO_DEBUG", "1") == "1"
 ALLOWED_HOSTS = [
-    "echooconnet.com",
-    "www.echooconnet.com",
+    "jobcraftsai.net",
+    "www.jobcraftsai.net",
     "127.0.0.1",
     "localhost",
 ]
