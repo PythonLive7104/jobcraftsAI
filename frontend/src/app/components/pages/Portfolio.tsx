@@ -210,17 +210,17 @@ export function Portfolio() {
 
   if (proRequired) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Card className="max-w-md">
-          <CardHeader>
-            <CardTitle>Pro Feature</CardTitle>
-            <CardDescription>
-              Portfolio is available for Pro subscribers. Upgrade to create your shareable portfolio page.
+      <div className="min-h-screen flex items-center justify-center p-4">
+        <Card className="w-full max-w-2xl">
+          <CardHeader className="space-y-2">
+            <CardTitle className="text-2xl">Pro Feature</CardTitle>
+            <CardDescription className="text-base">
+              Portfolio is available for Pro subscribers. Upgrade to create your shareable portfolio page and showcase your experience, projects, and skills to recruiters.
             </CardDescription>
           </CardHeader>
           <CardContent>
             <Link to="/pricing">
-              <Button>Upgrade to Pro</Button>
+              <Button size="lg">Upgrade to Pro</Button>
             </Link>
           </CardContent>
         </Card>
