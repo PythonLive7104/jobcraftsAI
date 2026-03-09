@@ -41,6 +41,15 @@ from .serializers import (
 from accounts.permissions import IsEmailVerified
 from .permissions import HasFeatureAccess, HasProPlan
 from .utils import extract_text_from_pdf, extract_text_from_docx
+
+
+def _sanitize_extracted_text(text: str) -> str:
+    """Remove NUL chars that break PostgreSQL/JSON."""
+    if not text:
+        return text
+    return text.replace("\x00", "")
+
+
 from .ai import (
     analyze_job_description_with_gpt5,
     ats_optimize,
@@ -687,7 +696,7 @@ class ResumeUploadAPI(APIView):
                     else:
                         text = extract_text_from_docx(fp)
 
-            resume.extracted_text = text
+            resume.extracted_text = _sanitize_extracted_text(text or "")
             resume.parse_status = "done"
             resume.save(update_fields=["extracted_text", "parse_status"])
         except Exception as e:
