@@ -340,8 +340,8 @@ export function LandingPage() {
 
       {/* Contact and Social */}
       <section className="py-16 border-t border-border/50 bg-muted/10">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 grid gap-8 md:grid-cols-2 items-start justify-items-start">
-          <div className="w-full">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 grid gap-8 md:grid-cols-2">
+          <div>
             <h3 className="text-2xl font-semibold mb-4">Contact Us</h3>
             <form className="space-y-3 max-w-xl" onSubmit={handleContactSubmit}>
               <div className="grid sm:grid-cols-2 gap-3">
@@ -381,7 +381,7 @@ export function LandingPage() {
             </form>
           </div>
 
-          <div className="w-full">
+          <div>
             <h3 className="text-2xl font-semibold mb-4">Follow Us</h3>
             <p className="text-sm text-muted-foreground mb-4">
               Stay connected for tips, updates, and career insights.
