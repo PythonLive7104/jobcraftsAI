@@ -16,8 +16,8 @@ import { Loader2, Plus, Trash2, Copy, ExternalLink } from 'lucide-react';
 import { toast } from 'sonner';
 import { fetchWithAuth, getErrorMessage, parseResponseBody } from '../../lib/api';
 
-type ExperienceItem = { job_role: string; achievements: string[] };
-type ProjectItem = { description: string; link: string };
+type ExperienceItem = { _id?: string; job_role: string; achievements: string[] };
+type ProjectItem = { _id?: string; description: string; link: string };
 type ResumeItem = { id: string; filename: string };
 
 export function Portfolio() {
@@ -86,13 +86,15 @@ export function Portfolio() {
             github_url?: string;
             share_url?: string;
           };
+          const ensureId = <T extends Record<string, unknown>>(item: T, i: number): T & { _id: string } =>
+            ({ ...item, _id: (item as T & { _id?: string })._id ?? `id-${Date.now()}-${i}-${Math.random().toString(36).slice(2)}` });
           setForm({
             name: p.name ?? '',
             title: p.title ?? '',
             location: p.location ?? '',
             short_summary: p.short_summary ?? '',
-            experience: Array.isArray(p.experience) ? p.experience : [],
-            projects: Array.isArray(p.projects) ? p.projects : [],
+            experience: Array.isArray(p.experience) ? p.experience.map((item, i) => ensureId(item, i)) : [],
+            projects: Array.isArray(p.projects) ? p.projects.map((item, i) => ensureId(item, i)) : [],
             skills: Array.isArray(p.skills) ? p.skills : [],
             resume: p.resume ?? null,
             email: p.email ?? '',
@@ -114,14 +116,15 @@ export function Portfolio() {
     e.preventDefault();
     setSaving(true);
     try {
+      const stripId = <T extends { _id?: string }>({ _id, ...rest }: T) => rest;
       const payload = {
         name: form.name,
         title: form.title,
         location: form.location,
         short_summary: form.short_summary,
-        experience: form.experience,
-        projects: form.projects,
-        skills: form.skills,
+        experience: form.experience.map(stripId),
+        projects: form.projects.map(stripId),
+        skills: form.skills.filter(Boolean),
         resume: form.resume || null,
         email: form.email,
         linkedin_url: form.linkedin_url,
@@ -149,7 +152,8 @@ export function Portfolio() {
   const addExperience = (e?: React.MouseEvent) => {
     e?.preventDefault();
     e?.stopPropagation();
-    setForm((f) => ({ ...f, experience: [...f.experience, { job_role: '', achievements: [''] }] }));
+    const id = `exp-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    setForm((f) => ({ ...f, experience: [...f.experience, { _id: id, job_role: '', achievements: [''] }] }));
   };
   const removeExperience = (i: number) =>
     setForm((f) => ({ ...f, experience: f.experience.filter((_, j) => j !== i) }));
@@ -164,7 +168,8 @@ export function Portfolio() {
   const addProject = (e?: React.MouseEvent) => {
     e?.preventDefault();
     e?.stopPropagation();
-    setForm((f) => ({ ...f, projects: [...f.projects, { description: '', link: '' }] }));
+    const id = `proj-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    setForm((f) => ({ ...f, projects: [...f.projects, { _id: id, description: '', link: '' }] }));
   };
   const removeProject = (i: number) =>
     setForm((f) => ({ ...f, projects: f.projects.filter((_, j) => j !== i) }));
@@ -177,7 +182,7 @@ export function Portfolio() {
   const [newSkill, setNewSkill] = useState('');
   const skillsStr = form.skills.join(', ');
   const setSkillsStr = (s: string) =>
-    setForm((f) => ({ ...f, skills: s.split(',').map((x) => x.trim()).filter(Boolean) }));
+    setForm((f) => ({ ...f, skills: s.split(',').map((x) => x.trim()) }));
   const addSkill = (e?: React.MouseEvent | React.KeyboardEvent) => {
     e?.preventDefault();
     e?.stopPropagation();
@@ -302,7 +307,7 @@ export function Portfolio() {
                 </p>
               )}
               {form.experience.map((exp, i) => (
-                <div key={`exp-${i}-${exp.job_role?.slice(0, 10) || 'new'}`} className="p-4 border rounded-lg space-y-3">
+                <div key={exp._id ?? `exp-${i}`} className="p-4 border rounded-lg space-y-3">
                   <div className="flex gap-2">
                     <Input
                       className="flex-1 min-w-0"
@@ -354,7 +359,7 @@ export function Portfolio() {
                 </p>
               )}
               {form.projects.map((proj, i) => (
-                <div key={`proj-${i}-${proj.link?.slice(0, 10) || 'new'}`} className="p-4 border rounded-lg space-y-3">
+                <div key={proj._id ?? `proj-${i}`} className="p-4 border rounded-lg space-y-3">
                   <div className="flex justify-end">
                     <Button type="button" variant="ghost" size="icon" onClick={() => removeProject(i)}>
                       <Trash2 className="w-4 h-4 text-destructive" />
@@ -403,9 +408,9 @@ export function Portfolio() {
                 onChange={(e) => setSkillsStr(e.target.value)}
                 placeholder="Or paste comma-separated: Python, React, AWS..."
               />
-              {form.skills.length > 0 && (
+              {form.skills.filter(Boolean).length > 0 && (
                 <div className="flex flex-wrap gap-2">
-                  {form.skills.map((skill, i) => (
+                  {form.skills.filter(Boolean).map((skill, i) => (
                     <span
                       key={`${skill}-${i}`}
                       className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-muted text-sm"
@@ -414,7 +419,11 @@ export function Portfolio() {
                       <button
                         type="button"
                         onClick={() =>
-                          setForm((f) => ({ ...f, skills: f.skills.filter((_, j) => j !== i) }))
+                          setForm((f) => {
+                            const idx = f.skills.indexOf(skill);
+                            if (idx === -1) return f;
+                            return { ...f, skills: [...f.skills.slice(0, idx), ...f.skills.slice(idx + 1)] };
+                          })
                         }
                         className="hover:text-destructive"
                         aria-label={`Remove ${skill}`}
