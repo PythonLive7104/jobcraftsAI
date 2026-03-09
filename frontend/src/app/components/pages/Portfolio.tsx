@@ -146,8 +146,11 @@ export function Portfolio() {
     }
   };
 
-  const addExperience = () =>
+  const addExperience = (e?: React.MouseEvent) => {
+    e?.preventDefault();
+    e?.stopPropagation();
     setForm((f) => ({ ...f, experience: [...f.experience, { job_role: '', achievements: [''] }] }));
+  };
   const removeExperience = (i: number) =>
     setForm((f) => ({ ...f, experience: f.experience.filter((_, j) => j !== i) }));
   const updateExperience = (i: number, field: 'job_role' | 'achievements', value: string | string[]) =>
@@ -158,8 +161,11 @@ export function Portfolio() {
       ),
     }));
 
-  const addProject = () =>
+  const addProject = (e?: React.MouseEvent) => {
+    e?.preventDefault();
+    e?.stopPropagation();
     setForm((f) => ({ ...f, projects: [...f.projects, { description: '', link: '' }] }));
+  };
   const removeProject = (i: number) =>
     setForm((f) => ({ ...f, projects: f.projects.filter((_, j) => j !== i) }));
   const updateProject = (i: number, field: 'description' | 'link', value: string) =>
@@ -168,9 +174,19 @@ export function Portfolio() {
       projects: f.projects.map((p, j) => (j === i ? { ...p, [field]: value } : p)),
     }));
 
+  const [newSkill, setNewSkill] = useState('');
   const skillsStr = form.skills.join(', ');
   const setSkillsStr = (s: string) =>
     setForm((f) => ({ ...f, skills: s.split(',').map((x) => x.trim()).filter(Boolean) }));
+  const addSkill = (e?: React.MouseEvent | React.KeyboardEvent) => {
+    e?.preventDefault();
+    e?.stopPropagation();
+    const toAdd = newSkill.trim();
+    if (toAdd) {
+      setForm((f) => ({ ...f, skills: [...f.skills, toAdd] }));
+      setNewSkill('');
+    }
+  };
 
   const copyLink = () => {
     if (shareUrl) {
@@ -274,16 +290,22 @@ export function Portfolio() {
                   <CardTitle>Experience</CardTitle>
                   <CardDescription>Job roles and achievements</CardDescription>
                 </div>
-                <Button type="button" variant="outline" size="sm" onClick={addExperience}>
-                  <Plus className="w-4 h-4 mr-1" /> Add
+                <Button type="button" variant="outline" size="sm" onClick={(e) => addExperience(e)}>
+                  <Plus className="w-4 h-4 mr-1" /> Add Experience
                 </Button>
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
+              {form.experience.length === 0 && (
+                <p className="text-sm text-muted-foreground py-2">
+                  No experience added yet. Click &quot;Add Experience&quot; to add your first entry.
+                </p>
+              )}
               {form.experience.map((exp, i) => (
-                <div key={i} className="p-4 border rounded-lg space-y-3">
-                  <div className="flex justify-between">
+                <div key={`exp-${i}-${exp.job_role?.slice(0, 10) || 'new'}`} className="p-4 border rounded-lg space-y-3">
+                  <div className="flex gap-2">
                     <Input
+                      className="flex-1 min-w-0"
                       placeholder="Job role"
                       value={exp.job_role}
                       onChange={(e) => updateExperience(i, 'job_role', e.target.value)}
@@ -300,7 +322,7 @@ export function Portfolio() {
                         updateExperience(
                           i,
                           'achievements',
-                          e.target.value.split('\n').filter(Boolean)
+                          e.target.value.split('\n')
                         )
                       }
                       rows={3}
@@ -320,14 +342,19 @@ export function Portfolio() {
                   <CardTitle>Projects</CardTitle>
                   <CardDescription>Project descriptions and links</CardDescription>
                 </div>
-                <Button type="button" variant="outline" size="sm" onClick={addProject}>
-                  <Plus className="w-4 h-4 mr-1" /> Add
+                <Button type="button" variant="outline" size="sm" onClick={(e) => addProject(e)}>
+                  <Plus className="w-4 h-4 mr-1" /> Add Project
                 </Button>
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
+              {form.projects.length === 0 && (
+                <p className="text-sm text-muted-foreground py-2">
+                  No projects added yet. Click &quot;Add Project&quot; to add your first entry.
+                </p>
+              )}
               {form.projects.map((proj, i) => (
-                <div key={i} className="p-4 border rounded-lg space-y-3">
+                <div key={`proj-${i}-${proj.link?.slice(0, 10) || 'new'}`} className="p-4 border rounded-lg space-y-3">
                   <div className="flex justify-end">
                     <Button type="button" variant="ghost" size="icon" onClick={() => removeProject(i)}>
                       <Trash2 className="w-4 h-4 text-destructive" />
@@ -352,15 +379,52 @@ export function Portfolio() {
           {/* Skills */}
           <Card>
             <CardHeader>
-              <CardTitle>Skills</CardTitle>
-              <CardDescription>Comma-separated skill tags</CardDescription>
+              <div className="flex justify-between items-center">
+                <div>
+                  <CardTitle>Skills</CardTitle>
+                  <CardDescription>Add skills one at a time or as comma-separated list</CardDescription>
+                </div>
+              </div>
             </CardHeader>
-            <CardContent>
+            <CardContent className="space-y-3">
+              <div className="flex gap-2">
+                <Input
+                  value={newSkill}
+                  onChange={(e) => setNewSkill(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && addSkill(e)}
+                  placeholder="Type a skill and press Enter or click Add"
+                />
+                <Button type="button" variant="outline" size="sm" onClick={addSkill}>
+                  <Plus className="w-4 h-4 mr-1" /> Add
+                </Button>
+              </div>
               <Input
                 value={skillsStr}
                 onChange={(e) => setSkillsStr(e.target.value)}
-                placeholder="Python, React, AWS, Leadership..."
+                placeholder="Or paste comma-separated: Python, React, AWS..."
               />
+              {form.skills.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {form.skills.map((skill, i) => (
+                    <span
+                      key={`${skill}-${i}`}
+                      className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-muted text-sm"
+                    >
+                      {skill}
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setForm((f) => ({ ...f, skills: f.skills.filter((_, j) => j !== i) }))
+                        }
+                        className="hover:text-destructive"
+                        aria-label={`Remove ${skill}`}
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
 
