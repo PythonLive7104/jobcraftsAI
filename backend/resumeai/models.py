@@ -88,20 +88,34 @@ class UserSubscription(models.Model):
         if feature == Feature.RESUME_UPLOAD:
             if self.plan == Plan.STARTER:
                 return 20
-            return 3
+            if self.plan == Plan.FREE:
+                return 1
+            return 1
         if feature == Feature.ATS_OPTIMIZE:
+            if self.plan == Plan.FREE:
+                return 1 + self.ats_bonus_credits
+            if self.plan == Plan.STARTER:
+                return 10 + self.ats_bonus_credits
             return 3 + self.ats_bonus_credits
         if feature == Feature.COVER_LETTER:
             if self.plan == Plan.STARTER:
-                return 10
-            return 3
+                return 5
+            if self.plan == Plan.FREE:
+                return 1
+            return 1
         if feature == Feature.INTERVIEW_PREP:
             if self.plan == Plan.STARTER:
                 return 8
+            if self.plan == Plan.FREE:
+                return 0
             return 2
         if feature == Feature.LINKEDIN:
+            if self.plan == Plan.FREE:
+                return 0
             return 3
         if feature == Feature.CAREER_GAP:
+            if self.plan == Plan.FREE:
+                return 0
             return 3
         return 0
 
