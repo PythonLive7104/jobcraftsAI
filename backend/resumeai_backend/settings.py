@@ -26,11 +26,18 @@ load_env_file()
 
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "django-insecure-change-me-in-production")
 DEBUG = os.getenv("DJANGO_DEBUG", "1") == "1"
-ALLOWED_HOSTS = [
+_allowed = os.getenv("DJANGO_ALLOWED_HOSTS", "").strip()
+ALLOWED_HOSTS = (
+    [h.strip() for h in _allowed.split(",") if h.strip()]
+    if _allowed
+    else []
+) + [
     "jobcraftsai.net",
     "www.jobcraftsai.net",
     "127.0.0.1",
     "localhost",
+    "backend",
+    "backend:8000",
 ]
 
 INSTALLED_APPS = [
