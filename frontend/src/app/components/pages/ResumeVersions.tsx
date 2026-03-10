@@ -116,10 +116,15 @@ export function ResumeVersions() {
       try {
         const response = await fetchWithAuth('/linkedin/history/');
         const data = await parseResponseBody(response);
-        if (!response.ok) return;
+        if (!response.ok) {
+          toast.error(getErrorMessage(data, 'Failed to load LinkedIn optimizations'));
+          setLinkedinOptimizations([]);
+          return;
+        }
         const payload = data as { items?: LinkedInOptimizationItem[] };
         setLinkedinOptimizations(payload.items ?? []);
-      } catch {
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : 'Failed to load LinkedIn optimizations');
         setLinkedinOptimizations([]);
       } finally {
         setLinkedinLoading(false);
@@ -335,12 +340,17 @@ export function ResumeVersions() {
             {linkedinLoading ? (
               <span className="text-sm text-muted-foreground">Loading LinkedIn optimizations...</span>
             ) : linkedinOptimizations.length === 0 ? (
-              <div className="text-sm text-muted-foreground">
-                No LinkedIn optimizations yet.{' '}
-                <Link to="/linkedin" className="text-indigo-400 hover:text-indigo-300">
-                  Optimize your LinkedIn profile
-                </Link>
-                .
+              <div className="text-sm text-muted-foreground space-y-2">
+                <p>
+                  No LinkedIn optimizations yet.{' '}
+                  <Link to="/linkedin" className="text-indigo-400 hover:text-indigo-300">
+                    Optimize your LinkedIn profile
+                  </Link>
+                  .
+                </p>
+                <p className="text-xs">
+                  Only optimizations run after this feature was added are stored. Run a new optimization to see it here.
+                </p>
               </div>
             ) : (
               <div className="space-y-3">
