@@ -98,8 +98,8 @@ export function Pricing() {
       } catch (error) {
         const msg = error instanceof Error ? error.message : 'Payment verification failed';
         toast.error(msg);
-        // Keep reference in URL so user can retry (e.g. after webhook updates plan)
-        navigate(`/pricing?reference=${encodeURIComponent(reference)}`, { replace: true });
+        // Remove reference from URL to stop retry loop; failed payments won't succeed on retry
+        navigate('/pricing', { replace: true });
       } finally {
         setVerifying(false);
       }
