@@ -1,4 +1,7 @@
+from io import BytesIO
+
 from docx import Document
+from docx.shared import Pt
 from pypdf import PdfReader
 
 
@@ -29,3 +32,16 @@ def extract_text_from_pdf(path_or_file) -> str:
         if text:
             parts.append(text)
     return _sanitize_text("\n".join(parts))
+
+
+def create_docx_from_text(text: str) -> bytes:
+    """Create a DOCX file from plain text. Each line becomes a paragraph."""
+    doc = Document()
+    style = doc.styles["Normal"]
+    style.font.size = Pt(11)
+    for line in (text or "").splitlines():
+        doc.add_paragraph(line.strip() or "")
+    buffer = BytesIO()
+    doc.save(buffer)
+    buffer.seek(0)
+    return buffer.getvalue()

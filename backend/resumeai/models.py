@@ -197,6 +197,20 @@ class CareerGapAnalysis(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
 
+class LinkedInOptimization(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="linkedin_optimizations")
+    target_role = models.CharField(max_length=180)
+    headlines = models.JSONField(default=list)  # list of strings
+    about_versions = models.JSONField(default=list)  # list of strings
+    experience_rewrites = models.JSONField(default=list)  # list of {before, after}
+    recommended_skills = models.JSONField(default=list)  # list of strings
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+
 class UserActivityAction(models.TextChoices):
     COVER_LETTER = "cover_letter", "Cover letter generated"
     INTERVIEW_PREP = "interview_prep", "Interview prep generated"

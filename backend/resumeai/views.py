@@ -21,6 +21,7 @@ import requests
 from .models import (
     ContactMessage,
     CareerGapAnalysis,
+    LinkedInOptimization,
     Portfolio,
     Resume,
     ResumeVersion,
@@ -40,7 +41,7 @@ from .serializers import (
 )
 from accounts.permissions import IsEmailVerified
 from .permissions import HasFeatureAccess, HasProPlan
-from .utils import extract_text_from_pdf, extract_text_from_docx
+from .utils import extract_text_from_pdf, extract_text_from_docx, create_docx_from_text
 
 
 def _sanitize_extracted_text(text: str) -> str:
@@ -55,6 +56,7 @@ from .ai import (
     ats_optimize,
     generate_cover_letter_with_gpt5,
     generate_interview_prep_with_gpt5,
+    answer_custom_interview_questions,
     linkedin_optimize,
     career_gap_analyze,
 )
@@ -881,6 +883,15 @@ class LinkedInOptimizeAPI(APIView):
             detail=target_role,
         )
 
+        LinkedInOptimization.objects.create(
+            user=request.user,
+            target_role=target_role,
+            headlines=result["headlines"],
+            about_versions=result["about_versions"],
+            experience_rewrites=result["experience_rewrites"],
+            recommended_skills=result["recommended_skills"],
+        )
+
         return Response({
             "target_role": target_role,
             "headlines": result["headlines"],
@@ -969,6 +980,12 @@ class InterviewPrepAPI(APIView):
             request.data.get("job_requirements", "").strip()
             or request.data.get("job_description", "").strip()
         )
+        custom_questions_raw = request.data.get("custom_questions")
+        custom_questions = []
+        if isinstance(custom_questions_raw, list):
+            custom_questions = [str(q).strip() for q in custom_questions_raw if str(q).strip()][:10]
+        elif isinstance(custom_questions_raw, str) and custom_questions_raw.strip():
+            custom_questions = [q.strip() for q in custom_questions_raw.split("\n") if q.strip()][:10]
 
         if not job_title:
             return Response({"error": "job_title is required"}, status=400)
@@ -979,6 +996,20 @@ class InterviewPrepAPI(APIView):
                 job_title=job_title,
                 job_requirements=job_requirements,
             )
+            categories = list(prep.get("categories", []))
+
+            if custom_questions:
+                custom_answers = answer_custom_interview_questions(
+                    questions=custom_questions,
+                    resume_text=resume.extracted_text or "",
+                    job_title=job_title,
+                    job_requirements=job_requirements,
+                )
+                if custom_answers:
+                    categories.append({
+                        "category": "Your Questions",
+                        "questions": custom_answers,
+                    })
         except ValueError as exc:
             return Response({"error": str(exc)}, status=503)
         except OpenAIError:
@@ -1002,7 +1033,7 @@ class InterviewPrepAPI(APIView):
             {
                 "resume_id": str(resume.id),
                 "job_title": job_title,
-                "categories": prep["categories"],
+                "categories": categories,
                 "usage": {
                     "used": sub.uses_for(Feature.INTERVIEW_PREP),
                     "limit": sub.limit_for(Feature.INTERVIEW_PREP),
@@ -1093,11 +1124,52 @@ class ResumeVersionsListAPI(APIView):
         })
 
 
+class LinkedInOptimizationListAPI(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        items = LinkedInOptimization.objects.filter(user=request.user).order_by("-created_at")[:50]
+        return Response({
+            "items": [
+                {
+                    "id": str(obj.id),
+                    "target_role": obj.target_role,
+                    "headlines": obj.headlines,
+                    "about_versions": obj.about_versions,
+                    "experience_rewrites": obj.experience_rewrites,
+                    "recommended_skills": obj.recommended_skills,
+                    "created_at": obj.created_at.isoformat(),
+                }
+                for obj in items
+            ]
+        })
+
+
 class ResumeVersionDetailAPI(APIView):
     permission_classes = [IsAuthenticated]
     def get(self, request, version_id):
         v = get_object_or_404(ResumeVersion, id=version_id, resume__user=request.user)
         return Response(ResumeVersionSerializer(v).data)
+
+
+class ResumeVersionDownloadAPI(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, version_id):
+        from django.http import HttpResponse
+
+        v = get_object_or_404(ResumeVersion, id=version_id, resume__user=request.user)
+        docx_bytes = create_docx_from_text(v.optimized_text or "")
+        # Sanitize filename for download
+        base = (v.title or v.target_role or v.job_title or "optimized-resume").strip()
+        base = "".join(c for c in base if c.isalnum() or c in " -_")[:80] or "optimized-resume"
+        filename = f"{base}.docx"
+        response = HttpResponse(
+            docx_bytes,
+            content_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        )
+        response["Content-Disposition"] = f'attachment; filename="{filename}"'
+        return response
 
 
 def _generate_portfolio_slug(user) -> str:

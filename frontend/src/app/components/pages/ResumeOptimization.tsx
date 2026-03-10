@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router';
-import { AlertCircle, CheckCircle, FileText, Loader2, Sparkles, Target, TrendingUp } from 'lucide-react';
+import { AlertCircle, CheckCircle, Download, FileText, Loader2, Sparkles, Target, TrendingUp } from 'lucide-react';
 import { toast } from 'sonner';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
@@ -83,6 +83,7 @@ export function ResumeOptimization() {
   const [optimizing, setOptimizing] = useState(false);
   const [result, setResult] = useState<OptimizeResponse | null>(null);
   const [atsUsage, setAtsUsage] = useState<AtsUsageSummary | null>(null);
+  const [downloading, setDownloading] = useState(false);
 
   const resumeId = selectedResumeId;
   const selectedResume = useMemo(
@@ -195,6 +196,35 @@ export function ResumeOptimization() {
       toast.error(error instanceof Error ? error.message : 'Optimization failed');
     } finally {
       setOptimizing(false);
+    }
+  };
+
+  const handleDownloadOptimized = async () => {
+    if (!result?.version?.id) return;
+    setDownloading(true);
+    try {
+      const response = await fetchWithAuth(`/versions/${result.version.id}/download/`);
+      if (!response.ok) {
+        const data = await parseResponseBody(response);
+        throw new Error(getErrorMessage(data, 'Download failed'));
+      }
+      const blob = await response.blob();
+      const disposition = response.headers.get('Content-Disposition');
+      const match = disposition?.match(/filename="?([^";\n]+)"?/);
+      const filename = match?.[1] ?? `optimized-resume-${result.version.target_role || result.version.job_title || 'resume'}.docx`.replace(/\s+/g, '-');
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast.success('Resume downloaded');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Download failed');
+    } finally {
+      setDownloading(false);
     }
   };
 
@@ -423,10 +453,23 @@ export function ResumeOptimization() {
                   <CardTitle>Optimized Resume Text</CardTitle>
                   <CardDescription>Saved as a version in your account</CardDescription>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="space-y-4">
                   <div className="rounded-lg border border-border/60 bg-muted/20 p-4 max-h-[420px] overflow-auto">
                     <pre className="text-xs whitespace-pre-wrap text-muted-foreground">{result.version.optimized_text}</pre>
                   </div>
+                  <Button
+                    onClick={handleDownloadOptimized}
+                    disabled={downloading}
+                    variant="default"
+                    className="gap-2"
+                  >
+                    {downloading ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Download className="w-4 h-4" />
+                    )}
+                    {downloading ? 'Downloading...' : 'Download Optimized Resume'}
+                  </Button>
                 </CardContent>
               </Card>
 

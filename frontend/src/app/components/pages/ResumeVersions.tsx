@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router';
-import { Calendar, Download, Eye, FileText, FolderOpen, Target } from 'lucide-react';
+import { Calendar, Copy, Download, Eye, FileText, FolderOpen, Linkedin, Loader2, Target } from 'lucide-react';
 import { toast } from 'sonner';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
@@ -25,12 +25,26 @@ type ResumeVersionItem = {
   created_at: string;
 };
 
+type LinkedInOptimizationItem = {
+  id: string;
+  target_role: string;
+  headlines: string[];
+  about_versions: string[];
+  experience_rewrites: { before: string; after: string }[];
+  recommended_skills: string[];
+  created_at: string;
+};
+
 export function ResumeVersions() {
   const [loading, setLoading] = useState(true);
   const [resumes, setResumes] = useState<ResumeItem[]>([]);
   const [activeResumeId, setActiveResumeId] = useState(window.localStorage.getItem('resumeai-current-resume-id') ?? '');
   const [versions, setVersions] = useState<ResumeVersionItem[]>([]);
   const [selectedVersion, setSelectedVersion] = useState<ResumeVersionItem | null>(null);
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [linkedinOptimizations, setLinkedinOptimizations] = useState<LinkedInOptimizationItem[]>([]);
+  const [linkedinLoading, setLinkedinLoading] = useState(false);
+  const [selectedLinkedin, setSelectedLinkedin] = useState<LinkedInOptimizationItem | null>(null);
 
   const activeResume = useMemo(
     () => resumes.find((resume) => resume.id === activeResumeId) ?? null,
@@ -96,6 +110,52 @@ export function ResumeVersions() {
     void loadVersions();
   }, [activeResumeId]);
 
+  useEffect(() => {
+    const loadLinkedin = async () => {
+      setLinkedinLoading(true);
+      try {
+        const response = await fetchWithAuth('/linkedin/history/');
+        const data = await parseResponseBody(response);
+        if (!response.ok) return;
+        const payload = data as { items?: LinkedInOptimizationItem[] };
+        setLinkedinOptimizations(payload.items ?? []);
+      } catch {
+        setLinkedinOptimizations([]);
+      } finally {
+        setLinkedinLoading(false);
+      }
+    };
+    void loadLinkedin();
+  }, []);
+
+  const handleDownloadVersion = async (version: ResumeVersionItem) => {
+    setDownloadingId(version.id);
+    try {
+      const response = await fetchWithAuth(`/versions/${version.id}/download/`);
+      if (!response.ok) {
+        const data = await parseResponseBody(response);
+        throw new Error(getErrorMessage(data, 'Download failed'));
+      }
+      const blob = await response.blob();
+      const disposition = response.headers.get('Content-Disposition');
+      const match = disposition?.match(/filename="?([^";\n]+)"?/);
+      const filename = match?.[1] ?? `optimized-resume-${version.target_role || version.job_title || 'resume'}.docx`.replace(/\s+/g, '-');
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast.success('Resume downloaded');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Download failed');
+    } finally {
+      setDownloadingId(null);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -109,7 +169,7 @@ export function ResumeVersions() {
           </Link>
         </div>
 
-        <div className="grid md:grid-cols-3 gap-4 mb-8">
+        <div className="grid md:grid-cols-4 gap-4 mb-8">
           <Card className="border-border/50">
             <CardContent className="p-6">
               <div className="text-2xl font-bold mb-1">{resumes.length}</div>
@@ -119,7 +179,13 @@ export function ResumeVersions() {
           <Card className="border-border/50">
             <CardContent className="p-6">
               <div className="text-2xl font-bold mb-1">{versions.length}</div>
-              <div className="text-sm text-muted-foreground">Total Versions</div>
+              <div className="text-sm text-muted-foreground">ATS Versions</div>
+            </CardContent>
+          </Card>
+          <Card className="border-border/50">
+            <CardContent className="p-6">
+              <div className="text-2xl font-bold mb-1">{linkedinOptimizations.length}</div>
+              <div className="text-sm text-muted-foreground">LinkedIn</div>
             </CardContent>
           </Card>
           <Card className="border-border/50">
@@ -230,8 +296,22 @@ export function ResumeVersions() {
                             toast.success('Optimized text copied to clipboard');
                           }}
                         >
-                          <Download className="w-4 h-4" />
+                          <Copy className="w-4 h-4" />
                           Copy
+                        </Button>
+                        <Button
+                          variant="default"
+                          size="sm"
+                          className="gap-2"
+                          onClick={() => void handleDownloadVersion(version)}
+                          disabled={downloadingId === version.id}
+                        >
+                          {downloadingId === version.id ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <Download className="w-4 h-4" />
+                          )}
+                          Download
                         </Button>
                       </div>
                     </div>
@@ -242,16 +322,146 @@ export function ResumeVersions() {
           </CardContent>
         </Card>
 
+        {/* LinkedIn Optimizations */}
+        <Card className="border-border/50 mt-6">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Linkedin className="w-5 h-5 text-blue-500" />
+              LinkedIn Optimizations
+            </CardTitle>
+            <CardDescription>Your LinkedIn profile optimizations</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {linkedinLoading ? (
+              <span className="text-sm text-muted-foreground">Loading LinkedIn optimizations...</span>
+            ) : linkedinOptimizations.length === 0 ? (
+              <div className="text-sm text-muted-foreground">
+                No LinkedIn optimizations yet.{' '}
+                <Link to="/linkedin" className="text-indigo-400 hover:text-indigo-300">
+                  Optimize your LinkedIn profile
+                </Link>
+                .
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {linkedinOptimizations.map((item) => (
+                  <div
+                    key={item.id}
+                    className="p-4 rounded-lg border border-border/50 hover:bg-muted/30 transition-colors"
+                  >
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex items-start gap-4 flex-1">
+                        <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500/10 to-cyan-500/10 flex items-center justify-center flex-shrink-0">
+                          <Linkedin className="w-5 h-5 text-blue-500" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h4 className="font-medium mb-1">{item.target_role}</h4>
+                          <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+                            <span className="flex items-center gap-1">
+                              <Calendar className="w-3 h-3" />
+                              {new Date(item.created_at).toLocaleString()}
+                            </span>
+                          </div>
+                          <div className="flex flex-wrap gap-2 mt-2">
+                            <Badge variant="outline">{item.headlines?.length ?? 0} headlines</Badge>
+                            <Badge variant="outline">{item.about_versions?.length ?? 0} about versions</Badge>
+                          </div>
+                        </div>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="gap-2"
+                        onClick={() => setSelectedLinkedin(selectedLinkedin?.id === item.id ? null : item)}
+                      >
+                        <Eye className="w-4 h-4" />
+                        View
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {selectedLinkedin && (
+          <Card className="border-blue-500/50 bg-gradient-to-br from-blue-500/10 to-cyan-500/10 mt-6">
+            <CardHeader>
+              <CardTitle>{selectedLinkedin.target_role}</CardTitle>
+              <CardDescription>LinkedIn optimization preview</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {selectedLinkedin.headlines?.length > 0 && (
+                <div>
+                  <h4 className="font-medium mb-2">Headlines</h4>
+                  <ul className="space-y-1 text-sm text-muted-foreground">
+                    {selectedLinkedin.headlines.map((h, i) => (
+                      <li key={i}>{h}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {selectedLinkedin.about_versions?.length > 0 && (
+                <div>
+                  <h4 className="font-medium mb-2">About</h4>
+                  <ul className="space-y-2 text-sm text-muted-foreground">
+                    {selectedLinkedin.about_versions.map((a, i) => (
+                      <li key={i}>{a}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {selectedLinkedin.experience_rewrites?.length > 0 && (
+                <div>
+                  <h4 className="font-medium mb-2">Experience Rewrites</h4>
+                  <div className="space-y-2 text-sm">
+                    {selectedLinkedin.experience_rewrites.map((r, i) => (
+                      <div key={i} className="p-3 rounded border border-border/50">
+                        <p className="text-muted-foreground line-through">{r.before}</p>
+                        <p className="text-foreground mt-1">{r.after}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {selectedLinkedin.recommended_skills?.length > 0 && (
+                <div>
+                  <h4 className="font-medium mb-2">Recommended Skills</h4>
+                  <div className="flex flex-wrap gap-2">
+                    {selectedLinkedin.recommended_skills.map((s, i) => (
+                      <Badge key={i} variant="secondary">{s}</Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
         {selectedVersion && (
           <Card className="border-indigo-500/50 bg-gradient-to-br from-indigo-500/10 to-cyan-500/10 mt-6">
             <CardHeader>
               <CardTitle>{selectedVersion.title}</CardTitle>
               <CardDescription>Preview of optimized resume text</CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="space-y-4">
               <div className="rounded-lg border border-border/60 bg-muted/20 p-4 max-h-[420px] overflow-auto">
                 <pre className="text-xs whitespace-pre-wrap text-muted-foreground">{selectedVersion.optimized_text}</pre>
               </div>
+              <Button
+                variant="default"
+                className="gap-2"
+                onClick={() => void handleDownloadVersion(selectedVersion)}
+                disabled={downloadingId === selectedVersion.id}
+              >
+                {downloadingId === selectedVersion.id ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Download className="w-4 h-4" />
+                )}
+                Download Optimized Resume
+              </Button>
             </CardContent>
           </Card>
         )}

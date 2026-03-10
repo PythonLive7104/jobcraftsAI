@@ -564,3 +564,83 @@ def generate_interview_prep_with_gpt5(
         raise ValueError("No usable interview prep content returned by GPT model.")
 
     return {"categories": categories}
+
+
+def answer_custom_interview_questions(
+    questions: list[str],
+    resume_text: str,
+    job_title: str,
+    job_requirements: str = "",
+) -> list[dict[str, Any]]:
+    """Generate suggested answers for custom interview questions. Returns list of question/answer dicts."""
+    if not questions:
+        return []
+
+    model = os.getenv("OPENAI_INTERVIEW_PREP_MODEL", "gpt-4o")
+    client = _openai_client()
+
+    questions_text = "\n".join(f"- {q.strip()}" for q in questions if q.strip())[:2000]
+    prompt = (
+        "You are an expert interview coach. Answer each interview question based on the resume and job context.\n"
+        "Return ONLY valid JSON with this exact schema:\n"
+        "{\n"
+        '  "answers": [\n'
+        "    {\n"
+        '      "question": string,\n'
+        '      "suggested_answer": string,\n'
+        '      "tips": [string, ...],\n'
+        '      "star_framework": {\n'
+        '        "situation": string,\n'
+        '        "task": string,\n'
+        '        "action": string,\n'
+        '        "result": string\n'
+        "      } | null\n"
+        "    }\n"
+        "  ]\n"
+        "}\n"
+        "Rules:\n"
+        "- answers array must have one entry per question, in the same order.\n"
+        "- suggested_answer: 2-4 paragraphs, interview-ready.\n"
+        "- tips: 2-4 concise bullets.\n"
+        "- Use STAR framework for behavioral questions, otherwise null.\n"
+        "- Do not include extra keys.\n\n"
+        f"Questions:\n{questions_text}\n\n"
+        f"Job Title: {job_title}\n\n"
+        f"Job Requirements:\n{job_requirements[:4000] or 'N/A'}\n\n"
+        f"Resume Text:\n{resume_text[:8000]}\n"
+    )
+
+    raw = _chat_completion(client, model, prompt)
+    if not raw:
+        raise ValueError("Empty response from GPT model.")
+
+    parsed = _extract_json(raw)
+    answers_raw = parsed.get("answers", []) if isinstance(parsed, dict) else []
+    if not isinstance(answers_raw, list):
+        return []
+
+    result: list[dict[str, Any]] = []
+    for i, ans in enumerate(answers_raw[:10]):  # cap at 10
+        if not isinstance(ans, dict):
+            continue
+        question = questions[i] if i < len(questions) else str(ans.get("question", "")).strip()
+        suggested_answer = str(ans.get("suggested_answer", "")).strip()
+        tips_raw = ans.get("tips", [])
+        tips = [str(t).strip() for t in (tips_raw if isinstance(tips_raw, list) else []) if str(t).strip()][:4]
+        star_raw = ans.get("star_framework")
+        star: dict[str, str] | None = None
+        if isinstance(star_raw, dict):
+            s = str(star_raw.get("situation", "")).strip()
+            t = str(star_raw.get("task", "")).strip()
+            a = str(star_raw.get("action", "")).strip()
+            r = str(star_raw.get("result", "")).strip()
+            if s and t and a and r:
+                star = {"situation": s, "task": t, "action": a, "result": r}
+        if question and suggested_answer:
+            result.append({
+                "question": question,
+                "suggested_answer": suggested_answer,
+                "tips": tips,
+                "star_framework": star,
+            })
+    return result

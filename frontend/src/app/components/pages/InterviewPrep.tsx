@@ -7,7 +7,7 @@ import { Label } from '../ui/label';
 import { Textarea } from '../ui/textarea';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '../ui/accordion';
 import { Badge } from '../ui/badge';
-import { AlertCircle, ChevronRight, GraduationCap, Lightbulb, Loader2, Sparkles } from 'lucide-react';
+import { AlertCircle, ChevronRight, GraduationCap, Lightbulb, Loader2, Plus, Sparkles, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { fetchWithAuth, getErrorMessage, parseResponseBody } from '../../lib/api';
 
@@ -47,6 +47,7 @@ export function InterviewPrep() {
   const resumeId = window.localStorage.getItem('resumeai-current-resume-id');
   const [jobTitle, setJobTitle] = useState('');
   const [jobRequirements, setJobRequirements] = useState('');
+  const [customQuestions, setCustomQuestions] = useState<string[]>(['']);
   const [generating, setGenerating] = useState(false);
   const [categories, setCategories] = useState<InterviewCategory[]>([]);
   const [usage, setUsage] = useState<{ used: number; limit: number } | null>(null);
@@ -96,6 +97,7 @@ export function InterviewPrep() {
         body: JSON.stringify({
           job_title: jobTitle,
           job_requirements: jobRequirements,
+          custom_questions: customQuestions.filter((q) => q.trim()),
         }),
       });
       const data = await parseResponseBody(response);
@@ -183,6 +185,52 @@ export function InterviewPrep() {
                   value={jobRequirements}
                   onChange={(event) => setJobRequirements(event.target.value)}
                 />
+              </div>
+              <div>
+                <Label>Your Own Questions (Optional)</Label>
+                <p className="text-xs text-muted-foreground mb-2">
+                  Add questions you want AI to answer based on your resume and the job
+                </p>
+                <div className="space-y-2">
+                  {customQuestions.map((q, index) => (
+                    <div key={index} className="flex gap-2">
+                      <Input
+                        placeholder={`Question ${index + 1}...`}
+                        value={q}
+                        onChange={(e) => {
+                          setCustomQuestions((prev) => {
+                            const next = [...prev];
+                            next[index] = e.target.value;
+                            return next;
+                          });
+                        }}
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        onClick={() => {
+                          setCustomQuestions((prev) =>
+                            prev.length > 1 ? prev.filter((_, i) => i !== index) : ['']
+                          );
+                        }}
+                        aria-label="Remove question"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  ))}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="gap-2"
+                    onClick={() => setCustomQuestions((prev) => [...prev, ''])}
+                  >
+                    <Plus className="w-4 h-4" />
+                    Add Question
+                  </Button>
+                </div>
               </div>
               <Button onClick={handleGenerate} className="gap-2" disabled={generating || !resumeId || !jobTitle.trim()}>
                 <Sparkles className="w-4 h-4" />
