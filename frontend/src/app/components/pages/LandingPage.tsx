@@ -464,12 +464,9 @@ export function LandingPage() {
             </div>
           </div>
 
-          <div className="mt-10 pt-6 border-t border-border/50 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+          <div className="mt-10 pt-6 border-t border-border/50">
             <p className="text-sm text-muted-foreground">
               © 2026 JobCrafts AI. Empowering job seekers globally.
-            </p>
-            <p className="text-xs text-muted-foreground">
-              Secure authentication enabled with Django + DRF backend
             </p>
           </div>
         </div>

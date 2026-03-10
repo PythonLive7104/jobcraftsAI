@@ -206,14 +206,14 @@ export function Dashboard() {
 
         {/* Portfolio (Pro) */}
         {summary?.plan?.is_pro && (
-          <Card className="mb-8 border-rose-500/30 bg-gradient-to-br from-rose-500/5 to-amber-500/5">
+          <Card className="mb-8 border-rose-500/30 bg-gradient-to-br from-rose-500/5 to-amber-500/5 overflow-hidden">
             <CardContent className="p-6">
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-rose-500 to-amber-500 flex items-center justify-center">
+                <div className="flex items-center gap-3 min-w-0 flex-1">
+                  <div className="w-12 h-12 flex-shrink-0 rounded-lg bg-gradient-to-br from-rose-500 to-amber-500 flex items-center justify-center">
                     <Globe className="w-6 h-6 text-white" />
                   </div>
-                  <div>
+                  <div className="min-w-0 flex-1">
                     <h3 className="font-semibold mb-1">Your Portfolio</h3>
                     <p className="text-sm text-muted-foreground">
                       {summary.portfolio?.has_portfolio
@@ -221,14 +221,14 @@ export function Dashboard() {
                         : 'Create a shareable portfolio page'}
                     </p>
                     {summary.portfolio?.share_url && (
-                      <p className="text-sm text-indigo-500 mt-1 font-mono truncate max-w-md">
+                      <p className="text-sm text-indigo-500 mt-1 font-mono truncate">
                         {summary.portfolio.share_url}
                       </p>
                     )}
                   </div>
                 </div>
-                <Link to="/portfolio">
-                  <Button variant={summary.portfolio?.has_portfolio ? 'outline' : 'default'} className="gap-2">
+                <Link to="/portfolio" className="flex-shrink-0">
+                  <Button variant={summary.portfolio?.has_portfolio ? 'outline' : 'default'} className="gap-2 w-full sm:w-auto">
                     {summary.portfolio?.has_portfolio ? 'Edit Portfolio' : 'Create Portfolio'}
                   </Button>
                 </Link>
