@@ -373,19 +373,32 @@ export function ResumeOptimization() {
             <>
               <Card className="border-emerald-500/50 bg-gradient-to-br from-emerald-500/10 to-cyan-500/10">
                 <CardContent className="p-6">
-                  <div className="flex items-start gap-4">
+                  <div className="flex flex-col sm:flex-row sm:items-start gap-4">
                     <div className="w-12 h-12 rounded-full bg-emerald-500/20 flex items-center justify-center flex-shrink-0">
                       <CheckCircle className="w-6 h-6 text-emerald-400" />
                     </div>
                     <div className="flex-1">
                       <h3 className="font-semibold mb-2">Optimization Complete</h3>
                       <p className="text-sm text-muted-foreground mb-4">Your optimized version has been saved.</p>
-                      <div className="flex items-center gap-4">
+                      <div className="flex items-center gap-4 mb-4">
                         <div className="flex-1">
                           <Progress value={result.ats.score} className="h-3" />
                         </div>
                         <span className="text-3xl font-bold text-emerald-400">{result.ats.score}%</span>
                       </div>
+                      <Button
+                        onClick={handleDownloadOptimized}
+                        disabled={downloading}
+                        variant="default"
+                        className="gap-2"
+                      >
+                        {downloading ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Download className="w-4 h-4" />
+                        )}
+                        {downloading ? 'Downloading...' : 'Download Optimized Resume'}
+                      </Button>
                     </div>
                   </div>
                 </CardContent>
