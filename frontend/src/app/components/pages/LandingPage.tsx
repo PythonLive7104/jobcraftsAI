@@ -22,6 +22,7 @@ import {
   Shield,
   Globe,
   Facebook,
+  Quote,
 } from 'lucide-react';
 
 export function LandingPage() {
@@ -233,6 +234,50 @@ export function LandingPage() {
                 </Card>
               );
             })}
+          </div>
+        </div>
+      </section>
+
+      {/* Testimonials Section */}
+      <section className="py-20 bg-muted/20">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl md:text-4xl font-bold mb-4">What Our Users Say</h2>
+            <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+              Join thousands of job seekers who have landed their dream roles with JobCrafts AI
+            </p>
+          </div>
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <Card className="border-border/50 bg-card/50">
+              <CardContent className="p-6">
+                <Quote className="w-8 h-8 text-indigo-500/40 mb-3" />
+                <p className="text-sm text-muted-foreground mb-4">
+                  &ldquo;JobCrafts AI helped me tailor my resume for each application. I went from zero callbacks to 3 interviews in 2 weeks. The ATS optimization is a game-changer.&rdquo;
+                </p>
+                <div className="font-medium">Sarah M.</div>
+                <div className="text-xs text-muted-foreground">Software Engineer, Lagos</div>
+              </CardContent>
+            </Card>
+            <Card className="border-border/50 bg-card/50">
+              <CardContent className="p-6">
+                <Quote className="w-8 h-8 text-indigo-500/40 mb-3" />
+                <p className="text-sm text-muted-foreground mb-4">
+                  &ldquo;The cover letter generator saved me hours. I used to dread writing them, but now I get personalized letters in seconds. Landed my first remote role thanks to JobCrafts.&rdquo;
+                </p>
+                <div className="font-medium">David K.</div>
+                <div className="text-xs text-muted-foreground">Product Manager, Nairobi</div>
+              </CardContent>
+            </Card>
+            <Card className="border-border/50 bg-card/50">
+              <CardContent className="p-6">
+                <Quote className="w-8 h-8 text-indigo-500/40 mb-3" />
+                <p className="text-sm text-muted-foreground mb-4">
+                  &ldquo;Interview prep with the STAR framework was exactly what I needed. I felt confident walking into my interviews. Got the job at my dream company!&rdquo;
+                </p>
+                <div className="font-medium">Amara O.</div>
+                <div className="text-xs text-muted-foreground">Data Analyst, Accra</div>
+              </CardContent>
+            </Card>
           </div>
         </div>
       </section>

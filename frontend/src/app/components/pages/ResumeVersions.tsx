@@ -272,8 +272,8 @@ export function ResumeVersions() {
                           isExpanded ? 'rounded-t-lg border-indigo-500/60 bg-indigo-500/10 ring-2 ring-indigo-500/30' : 'rounded-lg border-border/50 hover:bg-muted/30'
                         }`}
                       >
-                        <div className="flex items-start justify-between gap-4">
-                          <div className="flex items-start gap-4 flex-1">
+                        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+                          <div className="flex items-start gap-4 flex-1 min-w-0">
                             <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-indigo-500/10 to-cyan-500/10 flex items-center justify-center flex-shrink-0">
                               <FolderOpen className="w-5 h-5 text-indigo-400" />
                             </div>
@@ -294,11 +294,11 @@ export function ResumeVersions() {
                               </div>
                             </div>
                           </div>
-                          <div className="flex items-center gap-2 flex-shrink-0">
+                          <div className="flex flex-wrap items-center gap-2 shrink-0">
                             <Button
                               variant={isExpanded ? 'secondary' : 'outline'}
                               size="sm"
-                              className="gap-2"
+                              className="gap-1.5 shrink-0"
                               onClick={() => setSelectedVersion(isExpanded ? null : version)}
                             >
                               <Eye className="w-4 h-4" />
@@ -307,7 +307,7 @@ export function ResumeVersions() {
                             <Button
                               variant="outline"
                               size="sm"
-                              className="gap-2"
+                              className="gap-1.5 shrink-0"
                               onClick={() => {
                                 void navigator.clipboard.writeText(version.optimized_text);
                                 toast.success('Optimized text copied to clipboard');
@@ -319,7 +319,7 @@ export function ResumeVersions() {
                             <Button
                               variant="default"
                               size="sm"
-                              className="gap-2"
+                              className="gap-1.5 shrink-0"
                               onClick={() => void handleDownloadVersion(version)}
                               disabled={downloadingId === version.id}
                             >
@@ -339,19 +339,32 @@ export function ResumeVersions() {
                           <div className="rounded-lg border border-border/60 bg-muted/20 p-4 max-h-[420px] overflow-auto mb-4">
                             <pre className="text-xs whitespace-pre-wrap text-muted-foreground">{version.optimized_text}</pre>
                           </div>
-                          <Button
-                            variant="default"
-                            className="gap-2"
-                            onClick={() => void handleDownloadVersion(version)}
-                            disabled={downloadingId === version.id}
-                          >
-                            {downloadingId === version.id ? (
-                              <Loader2 className="w-4 h-4 animate-spin" />
-                            ) : (
-                              <Download className="w-4 h-4" />
-                            )}
-                            Download Optimized Resume
-                          </Button>
+                          <div className="flex flex-wrap gap-2">
+                            <Button
+                              variant="outline"
+                              className="gap-2"
+                              onClick={() => {
+                                void navigator.clipboard.writeText(version.optimized_text);
+                                toast.success('Optimized text copied to clipboard');
+                              }}
+                            >
+                              <Copy className="w-4 h-4" />
+                              Copy Text
+                            </Button>
+                            <Button
+                              variant="default"
+                              className="gap-2"
+                              onClick={() => void handleDownloadVersion(version)}
+                              disabled={downloadingId === version.id}
+                            >
+                              {downloadingId === version.id ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                              ) : (
+                                <Download className="w-4 h-4" />
+                              )}
+                              Download DOCX
+                            </Button>
+                          </div>
                         </div>
                       )}
                     </div>
@@ -398,8 +411,8 @@ export function ResumeVersions() {
                           isExpanded ? 'rounded-t-lg border-blue-500/60 bg-blue-500/10 ring-2 ring-blue-500/30' : 'rounded-lg border-border/50 hover:bg-muted/30'
                         }`}
                       >
-                        <div className="flex items-start justify-between gap-4">
-                          <div className="flex items-start gap-4 flex-1">
+                        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+                          <div className="flex items-start gap-4 flex-1 min-w-0">
                             <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500/10 to-cyan-500/10 flex items-center justify-center flex-shrink-0">
                               <Linkedin className="w-5 h-5 text-blue-500" />
                             </div>
@@ -420,7 +433,7 @@ export function ResumeVersions() {
                           <Button
                             variant={isExpanded ? 'secondary' : 'outline'}
                             size="sm"
-                            className="gap-2"
+                            className="gap-1.5 shrink-0"
                             onClick={() => setSelectedLinkedin(isExpanded ? null : item)}
                           >
                             <Eye className="w-4 h-4" />
