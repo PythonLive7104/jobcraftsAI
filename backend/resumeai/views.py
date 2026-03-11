@@ -53,6 +53,7 @@ def _sanitize_extracted_text(text: str) -> str:
 
 from .ai import (
     analyze_job_description_with_gpt5,
+    answer_help_question,
     ats_optimize,
     generate_cover_letter_with_gpt5,
     generate_interview_prep_with_gpt5,
@@ -122,6 +123,27 @@ class ContactUsAPI(APIView):
             )
 
         return Response({"detail": "Message received. We will get back to you soon."}, status=status.HTTP_201_CREATED)
+
+
+class HelpChatAPI(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        question = (request.data.get("question") or "").strip()
+        if not question:
+            return Response({"error": "question is required"}, status=400)
+        if len(question) > 500:
+            return Response({"error": "question too long"}, status=400)
+        try:
+            answer = answer_help_question(question)
+            return Response({"answer": answer})
+        except ValueError as exc:
+            return Response({"error": str(exc)}, status=503)
+        except OpenAIError:
+            return Response(
+                {"error": "AI service temporarily unavailable. Please try the Contact Us form."},
+                status=502,
+            )
 
 
 class PaymentInitializeAPI(APIView):

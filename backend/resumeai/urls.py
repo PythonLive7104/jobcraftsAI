@@ -3,6 +3,7 @@ from django.urls import path
 from .views import (
     ATSOptimizeAPI,
     ContactUsAPI,
+    HelpChatAPI,
     CoverLetterAPI,
     CareerGapAPI,
     CareerGapHistoryAPI,
@@ -30,6 +31,7 @@ from .views import (
 
 urlpatterns = [
     path("contact/", ContactUsAPI.as_view()),
+    path("help/chat/", HelpChatAPI.as_view()),
     path("me/", MeAPI.as_view()),
     path("dashboard/summary/", DashboardSummaryAPI.as_view()),
     path("payments/initialize/", PaymentInitializeAPI.as_view()),

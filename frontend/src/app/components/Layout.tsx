@@ -1,6 +1,6 @@
 import { Outlet, useLocation } from 'react-router';
 import { Navigation } from './Navigation';
-import { TawkChat } from './TawkChat';
+import { HelpChat } from './HelpChat';
 import { useEffect } from 'react';
 import { applySeoForPath } from '../lib/seo';
 
@@ -16,7 +16,7 @@ export function Layout() {
   return (
     <div className="min-h-screen bg-background">
       {!shouldHideNavigation && <Navigation />}
-      <TawkChat />
+      <HelpChat />
       <main>
         <Outlet />
       </main>

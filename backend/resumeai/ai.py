@@ -34,6 +34,37 @@ def _chat_completion(client: OpenAI, model: str, prompt: str) -> str:
     return raw
 
 
+def _get_help_qa_content() -> str:
+    """Load the help Q&A markdown file."""
+    from pathlib import Path
+    path = Path(__file__).resolve().parent / "help_qa.md"
+    try:
+        return path.read_text(encoding="utf-8")
+    except Exception:
+        return "JobCrafts AI is an AI-powered career platform. For support, contact jobcraftsai@gmail.com."
+
+
+def answer_help_question(question: str) -> str:
+    """Answer a user question about JobCrafts AI using the Q&A knowledge base."""
+    model = os.getenv("OPENAI_INTERVIEW_PREP_MODEL", "gpt-4o")
+    client = _openai_client()
+    qa_content = _get_help_qa_content()
+
+    prompt = (
+        "You are a helpful support assistant for JobCrafts AI, an AI-powered career platform for job seekers.\n"
+        "Answer the user's question based ONLY on the following knowledge base. "
+        "If the answer is not in the knowledge base, say you don't have that information and suggest they contact support.\n"
+        "Keep answers concise (2-4 sentences usually). Be friendly and helpful.\n\n"
+        "Knowledge base:\n"
+        f"{qa_content[:12000]}\n\n"
+        f"User question: {question[:500]}\n\n"
+        "Your answer:"
+    )
+
+    raw = _chat_completion(client, model, prompt)
+    return (raw or "I couldn't generate an answer. Please try the Contact Us form for human support.").strip()
+
+
 def analyze_job_description_with_gpt5(resume_text: str, job_description: str, job_title: str = "") -> dict[str, Any]:
     model = os.getenv("OPENAI_JOB_ANALYSIS_MODEL", "gpt-4o")
     client = _openai_client()

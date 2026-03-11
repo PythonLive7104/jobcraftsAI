@@ -384,7 +384,7 @@ export function LandingPage() {
       </section>
 
       {/* Contact and Social */}
-      <section className="py-16 border-t border-border/50 bg-muted/10">
+      <section id="contact" className="py-16 border-t border-border/50 bg-muted/10 scroll-mt-20">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 grid gap-8 md:grid-cols-2">
           <div>
             <h3 className="text-2xl font-semibold mb-4">Contact Us</h3>
