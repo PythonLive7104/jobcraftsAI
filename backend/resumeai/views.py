@@ -381,8 +381,18 @@ class PaymentVerifyAPI(APIView):
             )
 
         sub, _ = UserSubscription.objects.get_or_create(user=request.user)
+        sub.downgrade_if_expired()
+        # Carry over remaining credits so new plan credits are added to available ones
+        ats_remaining = max(0, sub.limit_for(Feature.ATS_OPTIMIZE) - sub.ats_uses)
+        cover_letter_remaining = max(0, sub.limit_for(Feature.COVER_LETTER) - sub.cover_letter_uses)
+        interview_prep_remaining = max(0, sub.limit_for(Feature.INTERVIEW_PREP) - sub.interview_prep_uses)
+        resume_remaining = max(0, sub.limit_for(Feature.RESUME_UPLOAD) - sub.uses_for(Feature.RESUME_UPLOAD))
         sub.plan = transaction.plan
         sub.period_start = timezone.now().date()
+        sub.ats_bonus_credits = ats_remaining
+        sub.cover_letter_bonus_credits = cover_letter_remaining
+        sub.interview_prep_bonus_credits = interview_prep_remaining
+        sub.resume_bonus_credits = resume_remaining
         sub.ats_uses = 0
         sub.cover_letter_uses = 0
         sub.interview_prep_uses = 0
@@ -391,6 +401,8 @@ class PaymentVerifyAPI(APIView):
         sub.save(
             update_fields=[
                 "plan", "period_start",
+                "ats_bonus_credits", "cover_letter_bonus_credits",
+                "interview_prep_bonus_credits", "resume_bonus_credits",
                 "ats_uses", "cover_letter_uses", "interview_prep_uses",
                 "linkedin_uses", "career_gap_uses",
             ]
@@ -435,8 +447,18 @@ def _apply_payment_success(transaction: PaymentTransaction) -> bool:
         sub.save(update_fields=["ats_bonus_credits"])
     else:
         sub, _ = UserSubscription.objects.get_or_create(user=transaction.user)
+        sub.downgrade_if_expired()
+        # Carry over remaining credits so new plan credits are added to available ones
+        ats_remaining = max(0, sub.limit_for(Feature.ATS_OPTIMIZE) - sub.ats_uses)
+        cover_letter_remaining = max(0, sub.limit_for(Feature.COVER_LETTER) - sub.cover_letter_uses)
+        interview_prep_remaining = max(0, sub.limit_for(Feature.INTERVIEW_PREP) - sub.interview_prep_uses)
+        resume_remaining = max(0, sub.limit_for(Feature.RESUME_UPLOAD) - sub.uses_for(Feature.RESUME_UPLOAD))
         sub.plan = transaction.plan
         sub.period_start = timezone.now().date()
+        sub.ats_bonus_credits = ats_remaining
+        sub.cover_letter_bonus_credits = cover_letter_remaining
+        sub.interview_prep_bonus_credits = interview_prep_remaining
+        sub.resume_bonus_credits = resume_remaining
         sub.ats_uses = 0
         sub.cover_letter_uses = 0
         sub.interview_prep_uses = 0
@@ -445,6 +467,8 @@ def _apply_payment_success(transaction: PaymentTransaction) -> bool:
         sub.save(
             update_fields=[
                 "plan", "period_start",
+                "ats_bonus_credits", "cover_letter_bonus_credits",
+                "interview_prep_bonus_credits", "resume_bonus_credits",
                 "ats_uses", "cover_letter_uses", "interview_prep_uses",
                 "linkedin_uses", "career_gap_uses",
             ]

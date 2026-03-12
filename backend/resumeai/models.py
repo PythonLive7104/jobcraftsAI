@@ -31,17 +31,53 @@ class UserSubscription(models.Model):
     ats_uses = models.PositiveIntegerField(default=0)
     ats_bonus_credits = models.PositiveIntegerField(default=0)
     cover_letter_uses = models.PositiveIntegerField(default=0)
+    cover_letter_bonus_credits = models.PositiveIntegerField(default=0)
     interview_prep_uses = models.PositiveIntegerField(default=0)
+    interview_prep_bonus_credits = models.PositiveIntegerField(default=0)
     linkedin_uses = models.PositiveIntegerField(default=0)
     career_gap_uses = models.PositiveIntegerField(default=0)
+    resume_bonus_credits = models.PositiveIntegerField(default=0)
     expiry_reminder_sent_for_period = models.DateField(null=True, blank=True)
 
+    def downgrade_if_expired(self):
+        """After 30 days, downgrade paid plans to FREE and deduct all credits."""
+        if self.plan == Plan.FREE:
+            return
+        today = timezone.now().date()
+        expires_on = self.period_start + timedelta(days=30)
+        if today <= expires_on:
+            return
+        self.plan = Plan.FREE
+        self.period_start = today
+        self.ats_uses = 0
+        self.ats_bonus_credits = 0
+        self.cover_letter_uses = 0
+        self.cover_letter_bonus_credits = 0
+        self.interview_prep_uses = 0
+        self.interview_prep_bonus_credits = 0
+        self.linkedin_uses = 0
+        self.career_gap_uses = 0
+        self.resume_bonus_credits = 0
+        self.expiry_reminder_sent_for_period = None
+        self.save(
+            update_fields=[
+                "plan", "period_start",
+                "ats_uses", "ats_bonus_credits",
+                "cover_letter_uses", "cover_letter_bonus_credits",
+                "interview_prep_uses", "interview_prep_bonus_credits",
+                "linkedin_uses", "career_gap_uses",
+                "resume_bonus_credits",
+                "expiry_reminder_sent_for_period",
+            ]
+        )
+
     def reset_if_new_month(self):
+        self.downgrade_if_expired()
         today = timezone.now().date()
         if self.period_start.month != today.month or self.period_start.year != today.year:
             self.period_start = today
             self.ats_uses = 0
-            self.ats_bonus_credits = 0
+            # Do NOT reset ats_bonus_credits - purchased credits persist and should be added to, not replaced
             self.cover_letter_uses = 0
             self.interview_prep_uses = 0
             self.linkedin_uses = 0
@@ -51,7 +87,6 @@ class UserSubscription(models.Model):
                 update_fields=[
                     "period_start",
                     "ats_uses",
-                    "ats_bonus_credits",
                     "cover_letter_uses",
                     "interview_prep_uses",
                     "linkedin_uses",
@@ -82,30 +117,39 @@ class UserSubscription(models.Model):
             except ValueError:
                 return default
 
+        starter_feature_limit = 20
         pro_feature_limit = _int_env("PRO_FEATURE_LIMIT", 50)
         if self.plan == Plan.PRO:
+            if feature == Feature.RESUME_UPLOAD:
+                return pro_feature_limit + self.resume_bonus_credits
+            if feature == Feature.ATS_OPTIMIZE:
+                return pro_feature_limit + self.ats_bonus_credits
+            if feature == Feature.COVER_LETTER:
+                return pro_feature_limit + self.cover_letter_bonus_credits
+            if feature == Feature.INTERVIEW_PREP:
+                return pro_feature_limit + self.interview_prep_bonus_credits
             return pro_feature_limit
         if feature == Feature.RESUME_UPLOAD:
             if self.plan == Plan.STARTER:
-                return 20
+                return starter_feature_limit + self.resume_bonus_credits
             if self.plan == Plan.FREE:
-                return 1
+                return 1 + self.resume_bonus_credits
             return 1
         if feature == Feature.ATS_OPTIMIZE:
             if self.plan == Plan.FREE:
                 return 1 + self.ats_bonus_credits
             if self.plan == Plan.STARTER:
-                return 10 + self.ats_bonus_credits
+                return starter_feature_limit + self.ats_bonus_credits
             return 3 + self.ats_bonus_credits
         if feature == Feature.COVER_LETTER:
             if self.plan == Plan.STARTER:
-                return 5
+                return starter_feature_limit + self.cover_letter_bonus_credits
             if self.plan == Plan.FREE:
                 return 1
             return 1
         if feature == Feature.INTERVIEW_PREP:
             if self.plan == Plan.STARTER:
-                return 8
+                return starter_feature_limit + self.interview_prep_bonus_credits
             if self.plan == Plan.FREE:
                 return 0
             return 2

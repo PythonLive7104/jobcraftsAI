@@ -12,6 +12,7 @@ class SubscriptionSerializer(serializers.ModelSerializer):
         fields = ["plan", "period_start", "limits", "usage"]
 
     def get_limits(self, obj):
+        obj.reset_if_new_month()
         return {
             "resumes": obj.limit_for(Feature.RESUME_UPLOAD),
             "ats": obj.limit_for(Feature.ATS_OPTIMIZE),
