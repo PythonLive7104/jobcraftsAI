@@ -9,7 +9,7 @@ import { useAuth } from '../../context/AuthContext';
 import { fetchWithAuth, getErrorMessage, parseResponseBody } from '../../lib/api';
 
 export function Pricing() {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [processingPlan, setProcessingPlan] = useState<'starter' | 'pro' | null>(null);
@@ -84,12 +84,27 @@ export function Pricing() {
     const reference = params.get('reference') || params.get('trxref');
     if (!reference || verifying) return;
 
+    // Wait for auth to finish loading before verifying (avoids 401 when token refresh is in progress)
+    if (authLoading) return;
+
+    // If user is not logged in, send them to login and bring them back with the reference to retry
+    if (!isAuthenticated) {
+      navigate('/login', { replace: true, state: { from: `/pricing?reference=${reference}` } });
+      return;
+    }
+
     const verifyPayment = async () => {
       setVerifying(true);
       try {
         const response = await fetchWithAuth(`/payments/verify/?reference=${encodeURIComponent(reference)}`);
         const data = await parseResponseBody(response);
         if (!response.ok) {
+          // If 401 (session expired), redirect to login so they can retry after re-auth
+          if (response.status === 401) {
+            toast.error('Session expired. Please log in again to complete verification.');
+            navigate('/login', { replace: true, state: { from: `/pricing?reference=${reference}` } });
+            return;
+          }
           throw new Error(getErrorMessage(data, 'Payment verification failed'));
         }
         const payload = data as { message?: string; status?: string; plan?: string };
@@ -106,7 +121,7 @@ export function Pricing() {
     };
 
     void verifyPayment();
-  }, [location.search, navigate, verifying]);
+  }, [location.search, navigate, verifying, authLoading, isAuthenticated]);
 
   const handlePlanCheckout = async (planKey: 'free' | 'starter' | 'pro') => {
     if (planKey === 'free') {
