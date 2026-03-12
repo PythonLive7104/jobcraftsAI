@@ -92,9 +92,9 @@ export function Pricing() {
         if (!response.ok) {
           throw new Error(getErrorMessage(data, 'Payment verification failed'));
         }
-        const payload = data as { message?: string; status?: string };
+        const payload = data as { message?: string; status?: string; plan?: string };
         toast.success(payload.message || 'Payment verified successfully');
-        navigate('/dashboard', { replace: true });
+        navigate('/payment-success', { replace: true, state: { plan: payload.plan, message: payload.message } });
       } catch (error) {
         const msg = error instanceof Error ? error.message : 'Payment verification failed';
         toast.error(msg);

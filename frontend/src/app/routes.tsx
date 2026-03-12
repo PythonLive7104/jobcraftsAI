@@ -11,6 +11,7 @@ import { LinkedInOptimizer } from "./components/pages/LinkedInOptimizer";
 import { CareerGap } from "./components/pages/CareerGap";
 import { ResumeVersions } from "./components/pages/ResumeVersions";
 import { Pricing } from "./components/pages/Pricing";
+import { PaymentSuccess } from "./components/pages/PaymentSuccess";
 import { Settings } from "./components/pages/Settings";
 import { NotFound } from "./components/pages/NotFound";
 import { Login } from "./components/pages/Login";
@@ -38,6 +39,7 @@ export const router = createBrowserRouter([
       {
         element: <ProtectedRoute />,
         children: [
+          { path: "payment-success", element: <PaymentSuccess /> },
           { path: "dashboard", element: <Dashboard /> },
           { path: "resume", element: <ResumeUpload /> },
           { path: "job-analysis", element: <JobAnalysis /> },
