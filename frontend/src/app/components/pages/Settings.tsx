@@ -31,12 +31,21 @@ type PaymentHistoryItem = {
 
 type SubscriptionData = {
   plan: string;
+  plan_display?: string;
   period_start: string;
+  expiry_date?: string | null;
+  days_until_expiry?: number | null;
   limits: {
     ats: number;
+    resumes?: number;
+    cover_letter?: number;
+    interview_prep?: number;
   };
   usage: {
     ats: number;
+    resumes?: number;
+    cover_letter?: number;
+    interview_prep?: number;
   };
 };
 
@@ -135,8 +144,8 @@ export function Settings() {
     return `${Math.max(subscription.limits.ats - subscription.usage.ats, 0)} of ${subscription.limits.ats} ATS optimizations remaining`;
   }, [subscription]);
 
-  const planName = subscription ? subscription.plan.charAt(0).toUpperCase() + subscription.plan.slice(1) : 'Free';
-  const hasSuccessfulPayment = payments.some((item) => item.status === 'success');
+  const planName = subscription?.plan_display ?? (subscription ? subscription.plan.charAt(0).toUpperCase() + subscription.plan.slice(1) : 'Free');
+  const isPaidPlan = subscription && subscription.plan !== 'free';
 
   const handleDeleteAccount = async () => {
     const confirmed = window.confirm(
@@ -318,9 +327,15 @@ export function Settings() {
               <Card className="border-indigo-500/40 bg-gradient-to-br from-indigo-500/10 to-cyan-500/10">
                 <CardHeader>
                   <CardTitle className="flex items-center justify-between">
-                    <span>{planName} Plan</span>
-                    <Badge className={hasSuccessfulPayment ? 'bg-emerald-500/20 text-emerald-300' : ''}>
-                      {hasSuccessfulPayment ? 'Active' : 'Free'}
+                    <span>Current Plan</span>
+                    <Badge
+                      className={
+                        isPaidPlan
+                          ? 'bg-emerald-500/20 text-emerald-300'
+                          : 'bg-muted text-muted-foreground'
+                      }
+                    >
+                      {planName}
                     </Badge>
                   </CardTitle>
                   <CardDescription>{atsSummary}</CardDescription>
@@ -328,11 +343,23 @@ export function Settings() {
                 <CardContent className="space-y-3">
                   <div className="text-xs text-muted-foreground flex items-center gap-2">
                     <CalendarClock className="w-3.5 h-3.5" />
-                    Billing period started:{' '}
+                    Period started:{' '}
                     {subscription?.period_start ? new Date(subscription.period_start).toLocaleDateString() : 'N/A'}
                   </div>
+                  {isPaidPlan && subscription?.expiry_date != null && (
+                    <div className="text-xs text-muted-foreground">
+                      {subscription.days_until_expiry != null && subscription.days_until_expiry >= 0 ? (
+                        <>
+                          Expires: {new Date(subscription.expiry_date).toLocaleDateString()} (
+                          {subscription.days_until_expiry} day{subscription.days_until_expiry !== 1 ? 's' : ''} left)
+                        </>
+                      ) : (
+                        <>Expired — renew to restore access</>
+                      )}
+                    </div>
+                  )}
                   <Link to="/pricing">
-                    <Button className="w-full">Manage Plan</Button>
+                    <Button className="w-full">{isPaidPlan ? 'Manage Plan' : 'Upgrade Plan'}</Button>
                   </Link>
                 </CardContent>
               </Card>

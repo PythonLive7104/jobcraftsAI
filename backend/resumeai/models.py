@@ -165,7 +165,11 @@ class UserSubscription(models.Model):
 
     def uses_for(self, feature: str) -> int:
         if feature == Feature.RESUME_UPLOAD:
-            return self.user.resumes.filter(created_at__date__gte=self.period_start).count()
+            from datetime import datetime, time as dt_time
+            start_dt = datetime.combine(self.period_start, dt_time.min)
+            if timezone.is_naive(start_dt):
+                start_dt = timezone.make_aware(start_dt)
+            return self.user.resumes.filter(created_at__gte=start_dt).count()
         if feature == Feature.ATS_OPTIMIZE:
             return self.ats_uses
         if feature == Feature.COVER_LETTER:

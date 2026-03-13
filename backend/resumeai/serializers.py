@@ -6,10 +6,23 @@ from .models import CareerGapAnalysis, Feature, JobAnalysis, Portfolio, Resume, 
 class SubscriptionSerializer(serializers.ModelSerializer):
     limits = serializers.SerializerMethodField()
     usage = serializers.SerializerMethodField()
+    plan_display = serializers.SerializerMethodField()
+    expiry_date = serializers.SerializerMethodField()
+    days_until_expiry = serializers.SerializerMethodField()
 
     class Meta:
         model = UserSubscription
-        fields = ["plan", "period_start", "limits", "usage"]
+        fields = ["plan", "plan_display", "period_start", "expiry_date", "days_until_expiry", "limits", "usage"]
+
+    def get_plan_display(self, obj):
+        return obj.get_plan_display()
+
+    def get_expiry_date(self, obj):
+        d = obj.expiry_date()
+        return d.isoformat() if d else None
+
+    def get_days_until_expiry(self, obj):
+        return obj.days_until_expiry()
 
     def get_limits(self, obj):
         obj.reset_if_new_month()

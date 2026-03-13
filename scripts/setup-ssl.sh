@@ -17,9 +17,7 @@ echo "=== Step 3: Restart nginx to free port 80 for certbot (standalone) ==="
 docker compose stop nginx
 
 echo "=== Step 4: Get SSL certificate with certbot ==="
-certbot certonly --standalone -d jobcraftsai.net -d www.jobcraftsai.net \
-  --non-interactive --agree-tos \
-  -m "${CERTBOT_EMAIL:-admin@jobcraftsai.net}"
+certbot certonly --standalone -d jobcraftsai.net -d www.jobcraftsai.net --noninteractive --agree-tos -m "${CERTBOT_EMAIL:-admin@jobcraftsai.net}"
 
 echo "=== Step 5: Switch to SSL nginx config ==="
 cp nginx/default-ssl.conf nginx/default.conf

@@ -753,6 +753,7 @@ class ResumeUploadAPI(APIView):
             resume.save(update_fields=["parse_status", "parse_error"])
 
         payload = ResumeDetailSerializer(resume).data
+        sub.refresh_from_db()
         payload["resume_usage"] = {
             "used": sub.uses_for(Feature.RESUME_UPLOAD),
             "limit": resume_limit,
@@ -781,7 +782,7 @@ class ResumeDetailAPI(APIView):
 
 
 class JobAnalysisAPI(APIView):
-    permission_classes = [IsAuthenticated, IsEmailVerified]
+    permission_classes = [IsAuthenticated, IsEmailVerified, HasFeatureAccess.with_feature(Feature.ATS_OPTIMIZE)]
 
     def post(self, request, resume_id):
         import logging
@@ -835,7 +836,17 @@ class JobAnalysisAPI(APIView):
             keywords=keywords,
             match=match_data,
         )
-        return Response(JobAnalysisSerializer(analysis).data, status=201)
+
+        sub, _ = UserSubscription.objects.get_or_create(user=request.user)
+        sub.reset_if_new_month()
+        sub.increment(Feature.ATS_OPTIMIZE)
+
+        data = JobAnalysisSerializer(analysis).data
+        data["usage"] = {
+            "used": sub.uses_for(Feature.ATS_OPTIMIZE),
+            "limit": sub.limit_for(Feature.ATS_OPTIMIZE),
+        }
+        return Response(data, status=201)
 
 
 class ATSOptimizeAPI(APIView):
