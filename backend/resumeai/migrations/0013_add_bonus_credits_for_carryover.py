@@ -25,19 +25,4 @@ class Migration(migrations.Migration):
             name='resume_bonus_credits',
             field=models.PositiveIntegerField(default=0),
         ),
-        migrations.AlterField(
-            model_name='portfolio',
-            name='experience',
-            field=models.JSONField(default=list, help_text='[{job_role, achievements: [str]}]'),
-        ),
-        migrations.AlterField(
-            model_name='portfolio',
-            name='projects',
-            field=models.JSONField(default=list, help_text='[{description, link}]'),
-        ),
-        migrations.AlterField(
-            model_name='portfolio',
-            name='skills',
-            field=models.JSONField(default=list, help_text='[str]'),
-        ),
     ]
