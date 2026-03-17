@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router';
-import { AlertCircle, CheckCircle, Download, FileText, Loader2, Sparkles, Target, TrendingUp } from 'lucide-react';
+import { AlertCircle, CheckCircle, Download, FileText, Loader2, Save, Sparkles, Target, TrendingUp } from 'lucide-react';
 import { toast } from 'sonner';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
@@ -8,6 +8,7 @@ import { Progress } from '../ui/progress';
 import { Badge } from '../ui/badge';
 import { Label } from '../ui/label';
 import { Textarea } from '../ui/textarea';
+import { ResumeEditor, type ResumeEditorHandle } from '../ResumeEditor';
 import { fetchWithAuth, getErrorMessage, parseResponseBody } from '../../lib/api';
 
 type OptimizeSuggestion = {
@@ -84,6 +85,9 @@ export function ResumeOptimization() {
   const [result, setResult] = useState<OptimizeResponse | null>(null);
   const [atsUsage, setAtsUsage] = useState<AtsUsageSummary | null>(null);
   const [downloading, setDownloading] = useState(false);
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const editorRef = useRef<ResumeEditorHandle>(null);
 
   const resumeId = selectedResumeId;
   const selectedResume = useMemo(
@@ -199,10 +203,50 @@ export function ResumeOptimization() {
     }
   };
 
+  const saveEditedResume = async (text?: string): Promise<boolean> => {
+    const content = text ?? editorRef.current?.getText();
+    if (content === undefined || !result?.version?.id) return false;
+    setSaving(true);
+    try {
+      const response = await fetchWithAuth(`/versions/${result.version.id}/`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ optimized_text: content }),
+      });
+      if (!response.ok) {
+        const data = await parseResponseBody(response);
+        throw new Error(getErrorMessage(data, 'Save failed'));
+      }
+      toast.success('Resume saved');
+      setResult((prev) =>
+        prev
+          ? {
+              ...prev,
+              version: { ...prev.version, optimized_text: content },
+            }
+          : prev,
+      );
+      return true;
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Save failed');
+      return false;
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const handleDownloadOptimized = async () => {
     if (!result?.version?.id) return;
     setDownloading(true);
     try {
+      const editedText = editorRef.current?.getText();
+      if (editedText !== undefined && editedText !== result.version.optimized_text) {
+        const saved = await saveEditedResume(editedText);
+        if (!saved) {
+          setDownloading(false);
+          return;
+        }
+      }
       const response = await fetchWithAuth(`/versions/${result.version.id}/download/`);
       if (!response.ok) {
         const data = await parseResponseBody(response);
@@ -225,6 +269,44 @@ export function ResumeOptimization() {
       toast.error(error instanceof Error ? error.message : 'Download failed');
     } finally {
       setDownloading(false);
+    }
+  };
+
+  const handleDownloadAsPdf = async () => {
+    const html = editorRef.current?.getHTML();
+    if (!html) {
+      toast.error('No content to export');
+      return;
+    }
+    setDownloadingPdf(true);
+    try {
+      const base = (result?.version?.target_role || result?.version?.job_title || 'optimized-resume').toString().replace(/\s+/g, '-');
+      const response = await fetchWithAuth('/export-pdf/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ html, filename: base }),
+      });
+      if (!response.ok) {
+        const data = await parseResponseBody(response);
+        throw new Error(getErrorMessage(data, 'PDF export failed'));
+      }
+      const blob = await response.blob();
+      const disposition = response.headers.get('Content-Disposition');
+      const match = disposition?.match(/filename="?([^";\n]+)"?/);
+      const filename = match?.[1] ?? `${base}.pdf`;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast.success('PDF downloaded');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'PDF download failed');
+    } finally {
+      setDownloadingPdf(false);
     }
   };
 
@@ -463,26 +545,59 @@ export function ResumeOptimization() {
 
               <Card className="border-border/50">
                 <CardHeader>
-                  <CardTitle>Optimized Resume Text</CardTitle>
-                  <CardDescription>Saved as a version in your account</CardDescription>
+                  <CardTitle>Edit & Download Optimized Resume</CardTitle>
+                  <CardDescription>
+                    Edit your resume below (bold, italic, lists). Save changes and download for job applications.
+                  </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="rounded-lg border border-border/60 bg-muted/20 p-4 max-h-[420px] overflow-auto">
-                    <pre className="text-xs whitespace-pre-wrap text-muted-foreground">{result.version.optimized_text}</pre>
+                  <ResumeEditor
+                    ref={editorRef}
+                    content={result.version.optimized_text}
+                    contentKey={result.version.id}
+                    minHeight="420px"
+                  />
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      onClick={saveEditedResume}
+                      disabled={saving}
+                      variant="outline"
+                      className="gap-2"
+                    >
+                      {saving ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Save className="w-4 h-4" />
+                      )}
+                      {saving ? 'Saving...' : 'Save Changes'}
+                    </Button>
+                    <Button
+                      onClick={handleDownloadOptimized}
+                      disabled={downloading}
+                      variant="default"
+                      className="gap-2"
+                    >
+                      {downloading ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Download className="w-4 h-4" />
+                      )}
+                      {downloading ? 'Downloading...' : 'Download DOCX'}
+                    </Button>
+                    <Button
+                      onClick={handleDownloadAsPdf}
+                      disabled={downloadingPdf}
+                      variant="outline"
+                      className="gap-2"
+                    >
+                      {downloadingPdf ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Download className="w-4 h-4" />
+                      )}
+                      {downloadingPdf ? 'Creating PDF...' : 'Download PDF'}
+                    </Button>
                   </div>
-                  <Button
-                    onClick={handleDownloadOptimized}
-                    disabled={downloading}
-                    variant="default"
-                    className="gap-2"
-                  >
-                    {downloading ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <Download className="w-4 h-4" />
-                    )}
-                    {downloading ? 'Downloading...' : 'Download Optimized Resume'}
-                  </Button>
                 </CardContent>
               </Card>
 

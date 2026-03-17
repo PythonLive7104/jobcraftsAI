@@ -41,7 +41,7 @@ from .serializers import (
 )
 from accounts.permissions import IsEmailVerified
 from .permissions import HasFeatureAccess, HasProPlan
-from .utils import extract_text_from_pdf, extract_text_from_docx, create_docx_from_text
+from .utils import extract_text_from_pdf, extract_text_from_docx, create_docx_from_text, pdf_to_html, html_to_pdf
 
 
 def _sanitize_extracted_text(text: str) -> str:
@@ -781,6 +781,48 @@ class ResumeDetailAPI(APIView):
         return Response(ResumeDetailSerializer(resume).data)
 
 
+class ResumePdfToHtmlAPI(APIView):
+    """Convert PDF resume to editable HTML. PDF only."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, resume_id):
+        from django.http import HttpResponse
+        resume = get_object_or_404(Resume, id=resume_id, user=request.user)
+        if resume.file_type.lower() != "pdf":
+            return Response({"error": "Only PDF resumes can be edited. Upload a PDF to use this feature."}, status=status.HTTP_400_BAD_REQUEST)
+        if not resume.original_file:
+            return Response({"error": "Resume file not found."}, status=status.HTTP_404_NOT_FOUND)
+        try:
+            with resume.original_file.open("rb") as fp:
+                html = pdf_to_html(fp)
+            if not html or not html.strip():
+                html = f"<p>{resume.extracted_text or 'No content extracted.'}</p>"
+            return Response({"html": html})
+        except Exception as e:
+            return Response({"error": str(e), "detail": "Failed to convert PDF to editable format."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class ExportPdfAPI(APIView):
+    """Convert HTML to PDF and return for download."""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        from django.http import HttpResponse
+        html = request.data.get("html", "")
+        if not html:
+            return Response({"error": "html content is required"}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            pdf_bytes = html_to_pdf(html)
+        except Exception as e:
+            return Response({"error": str(e), "detail": "Failed to create PDF."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        base = (request.data.get("filename") or "resume").strip()
+        base = "".join(c for c in base if c.isalnum() or c in " -_")[:80] or "resume"
+        filename = f"{base}.pdf"
+        response = HttpResponse(pdf_bytes, content_type="application/pdf")
+        response["Content-Disposition"] = f'attachment; filename="{filename}"'
+        return response
+
+
 class JobAnalysisAPI(APIView):
     permission_classes = [IsAuthenticated, IsEmailVerified, HasFeatureAccess.with_feature(Feature.ATS_OPTIMIZE)]
 
@@ -1204,8 +1246,17 @@ class LinkedInOptimizationListAPI(APIView):
 
 class ResumeVersionDetailAPI(APIView):
     permission_classes = [IsAuthenticated]
+
     def get(self, request, version_id):
         v = get_object_or_404(ResumeVersion, id=version_id, resume__user=request.user)
+        return Response(ResumeVersionSerializer(v).data)
+
+    def patch(self, request, version_id):
+        v = get_object_or_404(ResumeVersion, id=version_id, resume__user=request.user)
+        optimized_text = request.data.get("optimized_text")
+        if optimized_text is not None:
+            v.optimized_text = str(optimized_text)
+            v.save(update_fields=["optimized_text"])
         return Response(ResumeVersionSerializer(v).data)
 
 

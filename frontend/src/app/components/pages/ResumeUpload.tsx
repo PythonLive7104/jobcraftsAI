@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router';
-import { Upload, CheckCircle, Loader2 } from 'lucide-react';
+import { Link, useNavigate } from 'react-router';
+import { Upload, CheckCircle, Loader2, FileEdit } from 'lucide-react';
 import { toast } from 'sonner';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
@@ -325,7 +325,7 @@ export function ResumeUpload() {
               </CardContent>
             </Card>
 
-            <div className="flex gap-3">
+            <div className="flex flex-wrap gap-3">
               <Button
                 onClick={() => {
                   setUploaded(false);
@@ -337,6 +337,14 @@ export function ResumeUpload() {
               >
                 Upload Different Resume
               </Button>
+              {parsedData?.file_type?.toLowerCase() === 'pdf' && (
+                <Link to={`/resume/edit/${parsedData.id}`}>
+                  <Button variant="outline" className="gap-2">
+                    <FileEdit className="w-4 h-4" />
+                    Edit PDF
+                  </Button>
+                </Link>
+              )}
               <Button
                 onClick={() => {
                   if (!parsedData?.id) {

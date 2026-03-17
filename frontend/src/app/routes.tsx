@@ -10,6 +10,7 @@ import { InterviewPrep } from "./components/pages/InterviewPrep";
 import { LinkedInOptimizer } from "./components/pages/LinkedInOptimizer";
 import { CareerGap } from "./components/pages/CareerGap";
 import { ResumeVersions } from "./components/pages/ResumeVersions";
+import { ResumeEditPdf } from "./components/pages/ResumeEditPdf";
 import { Pricing } from "./components/pages/Pricing";
 import { PaymentSuccess } from "./components/pages/PaymentSuccess";
 import { Settings } from "./components/pages/Settings";
@@ -42,6 +43,7 @@ export const router = createBrowserRouter([
           { path: "payment-success", element: <PaymentSuccess /> },
           { path: "dashboard", element: <Dashboard /> },
           { path: "resume", element: <ResumeUpload /> },
+          { path: "resume/edit/:resumeId", element: <ResumeEditPdf /> },
           { path: "job-analysis", element: <JobAnalysis /> },
           { path: "optimize", element: <ResumeOptimization /> },
           { path: "cover-letter", element: <CoverLetter /> },
