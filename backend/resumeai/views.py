@@ -802,6 +802,50 @@ class ResumePdfToHtmlAPI(APIView):
             return Response({"error": str(e), "detail": "Failed to convert PDF to editable format."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+class ResumeSavePdfAPI(APIView):
+    """Save edited HTML as PDF, replacing the original uploaded file."""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, resume_id):
+        from django.core.files.base import ContentFile
+        from .utils import extract_text_from_pdf
+
+        resume = get_object_or_404(Resume, id=resume_id, user=request.user)
+        if resume.file_type.lower() != "pdf":
+            return Response(
+                {"error": "Only PDF resumes can be saved. Upload a PDF to use this feature."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        html = request.data.get("html", "")
+        if not html:
+            return Response({"error": "html content is required"}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            pdf_bytes = html_to_pdf(html)
+        except Exception as e:
+            return Response(
+                {"error": str(e), "detail": "Failed to create PDF."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+        base = (resume.filename or "resume").strip()
+        if not base.lower().endswith(".pdf"):
+            base = f"{base}.pdf" if base else "resume.pdf"
+        base = "".join(c for c in base if c.isalnum() or c in " ._-")[:80] or "resume.pdf"
+        try:
+            resume.original_file.save(base, ContentFile(pdf_bytes), save=True)
+            with resume.original_file.open("rb") as fp:
+                text = extract_text_from_pdf(fp)
+            resume.extracted_text = _sanitize_extracted_text(text or "")
+            resume.parse_status = "done"
+            resume.parse_error = ""
+            resume.save(update_fields=["extracted_text", "parse_status", "parse_error"])
+        except Exception as e:
+            return Response(
+                {"error": str(e), "detail": "Failed to save file."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+        return Response(ResumeDetailSerializer(resume).data)
+
+
 class ExportPdfAPI(APIView):
     """Convert HTML to PDF and return for download."""
     permission_classes = [IsAuthenticated]

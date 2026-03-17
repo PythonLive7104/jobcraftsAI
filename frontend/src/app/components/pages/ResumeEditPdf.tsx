@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router';
-import { ArrowLeft, Download, Loader2 } from 'lucide-react';
+import { ArrowLeft, Download, Loader2, Save } from 'lucide-react';
 import { toast } from 'sonner';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
@@ -11,6 +11,7 @@ export function ResumeEditPdf() {
   const { resumeId } = useParams<{ resumeId: string }>();
   const [loading, setLoading] = useState(true);
   const [downloading, setDownloading] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [htmlContent, setHtmlContent] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
   const [filename, setFilename] = useState('resume');
@@ -43,6 +44,31 @@ export function ResumeEditPdf() {
       cancelled = true;
     };
   }, [resumeId]);
+
+  const handleSavePdf = async () => {
+    const html = editorRef.current?.getHTML();
+    if (!html) {
+      toast.error('No content to save');
+      return;
+    }
+    setSaving(true);
+    try {
+      const response = await fetchWithAuth(`/resumes/${resumeId}/save-pdf/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ html }),
+      });
+      const data = await parseResponseBody(response);
+      if (!response.ok) {
+        throw new Error(getErrorMessage(data, 'Save failed'));
+      }
+      toast.success('Resume saved. Your edited file has replaced the original.');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Save failed');
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const handleDownloadPdf = async () => {
     const html = editorRef.current?.getHTML();
@@ -131,7 +157,7 @@ export function ResumeEditPdf() {
           <div>
             <h1 className="text-2xl font-bold">Edit PDF Resume</h1>
             <p className="text-muted-foreground text-sm mt-1">
-              Edit your resume below and download as PDF when done.
+              Edit your resume, save to replace the original, or download as PDF.
             </p>
           </div>
           <Link to="/resume">
@@ -146,7 +172,7 @@ export function ResumeEditPdf() {
           <CardHeader>
             <CardTitle>Resume Content</CardTitle>
             <CardDescription>
-              Make changes to your resume. Use the toolbar for bold, italic, and lists.
+              Make changes to your resume. Use the toolbar for bold, italic, and lists. Save to replace the uploaded file, or download a copy.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -157,18 +183,34 @@ export function ResumeEditPdf() {
               contentMode="html"
               minHeight="500px"
             />
-            <Button
-              onClick={handleDownloadPdf}
-              disabled={downloading}
-              className="gap-2"
-            >
+            <div className="flex flex-wrap gap-2">
+              <Button
+                onClick={handleSavePdf}
+                disabled={saving}
+                variant="default"
+                className="gap-2"
+              >
+                {saving ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Save className="w-4 h-4" />
+                )}
+                {saving ? 'Saving...' : 'Save & Replace Original'}
+              </Button>
+              <Button
+                onClick={handleDownloadPdf}
+                disabled={downloading}
+                variant="outline"
+                className="gap-2"
+              >
               {downloading ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
               ) : (
                 <Download className="w-4 h-4" />
               )}
-              {downloading ? 'Creating PDF...' : 'Download as PDF'}
-            </Button>
+                {downloading ? 'Creating PDF...' : 'Download as PDF'}
+              </Button>
+            </div>
           </CardContent>
         </Card>
       </div>
