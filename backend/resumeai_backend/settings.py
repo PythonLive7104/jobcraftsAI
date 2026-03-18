@@ -184,3 +184,29 @@ CORS_ALLOWED_ORIGINS = [
     ).split(",")
     if o.strip()
 ]
+
+# Celery & Redis
+_celery_broker = os.getenv("CELERY_BROKER_URL", "redis://localhost:6379/0")
+_celery_result = os.getenv("CELERY_RESULT_BACKEND", "redis://localhost:6379/1")
+_cache_url = os.getenv("CACHE_URL", "redis://localhost:6379/2")
+
+CELERY_BROKER_URL = _celery_broker
+CELERY_RESULT_BACKEND = _celery_result
+CELERY_ACCEPT_CONTENT = ["json"]
+CELERY_TASK_SERIALIZER = "json"
+CELERY_RESULT_SERIALIZER = "json"
+CELERY_TIMEZONE = "UTC"
+
+# Use eager mode when Redis is not available (e.g. local dev without Docker)
+CELERY_TASK_ALWAYS_EAGER = os.getenv("CELERY_TASK_ALWAYS_EAGER", "0") == "1"
+
+# Django cache: Redis when CACHE_URL is redis://, else locmem for local dev
+_use_redis_cache = _cache_url.startswith("redis://")
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.redis.RedisCache",
+        "LOCATION": _cache_url,
+    }
+} if _use_redis_cache else {
+    "default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}
+}

@@ -1,4 +1,18 @@
 services:
+  redis:
+    image: redis:7-alpine
+    container_name: jobcrafts_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
   backend:
     build:
       context: ./backend
@@ -6,8 +20,15 @@ services:
     container_name: jobcrafts_backend
     env_file:
       - ./backend/.env
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/1
+      - CACHE_URL=redis://redis:6379/2
     volumes:
       - ./backend:/app/backend
+    depends_on:
+      redis:
+        condition: service_healthy
     command: >
       sh -c "python manage.py collectstatic --noinput &&
              python manage.py migrate &&
@@ -50,3 +71,26 @@ services:
     depends_on:
       - frontend
       - backend
+
+  celery_worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: jobcrafts_celery_worker
+    env_file:
+      - ./backend/.env
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/1
+      - CACHE_URL=redis://redis:6379/2
+    volumes:
+      - ./backend:/app/backend
+    command: celery -A resumeai_backend worker -l info --concurrency=4
+    depends_on:
+      backend:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+volumes:
+  redis_data:

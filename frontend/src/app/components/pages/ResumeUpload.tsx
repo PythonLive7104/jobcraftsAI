@@ -161,6 +161,29 @@ export function ResumeUpload() {
     }
   };
 
+  // Poll for parse status when processing (Celery task running in background)
+  useEffect(() => {
+    if (parsedData?.parse_status !== 'processing' || !parsedData?.id) return;
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetchWithAuth(`/resumes/${parsedData.id}/`);
+        const data = await parseResponseBody(res);
+        if (res.ok) {
+          const updated = data as ParsedResume;
+          setParsedData(updated);
+          if (updated.parse_status === 'done') {
+            toast.success('Resume parsed successfully');
+          } else if (updated.parse_status === 'failed') {
+            toast.error(updated.parse_error || 'Parsing failed');
+          }
+        }
+      } catch {
+        // Ignore poll errors
+      }
+    }, 2000);
+    return () => clearInterval(interval);
+  }, [parsedData?.id, parsedData?.parse_status]);
+
   useEffect(() => {
     const restoreSavedResume = async () => {
       try {
@@ -298,8 +321,9 @@ export function ResumeUpload() {
                   </div>
                   <div>
                     <h3 className="font-semibold">Resume Uploaded</h3>
-                    <p className="text-sm text-muted-foreground">
-                      Status: {parsedData?.parse_status} {parsedData?.parse_error ? `• ${parsedData.parse_error}` : ''}
+                    <p className="text-sm text-muted-foreground flex items-center gap-2">
+                      Status: {parsedData?.parse_status === 'processing' && <Loader2 className="w-4 h-4 animate-spin" />}
+                      {parsedData?.parse_status} {parsedData?.parse_error ? `• ${parsedData.parse_error}` : ''}
                     </p>
                     {parsedData?.resume_usage && (
                       <p className="text-xs text-muted-foreground mt-1">
@@ -319,7 +343,9 @@ export function ResumeUpload() {
               <CardContent>
                 <div className="rounded-lg border border-border/60 bg-muted/20 p-4 max-h-[380px] overflow-auto">
                   <pre className="text-xs whitespace-pre-wrap text-muted-foreground">
-                    {parsedData?.extracted_text?.slice(0, 4500) || 'No extracted text returned.'}
+                    {parsedData?.parse_status === 'processing'
+                      ? 'Parsing in progress...'
+                      : parsedData?.extracted_text?.slice(0, 4500) || 'No extracted text returned.'}
                   </pre>
                 </div>
               </CardContent>
@@ -337,7 +363,7 @@ export function ResumeUpload() {
               >
                 Upload Different Resume
               </Button>
-              {parsedData?.file_type?.toLowerCase() === 'pdf' && (
+              {parsedData?.file_type?.toLowerCase() === 'pdf' && parsedData?.parse_status === 'done' && (
                 <Link to={`/resume/edit/${parsedData.id}`}>
                   <Button variant="outline" className="gap-2">
                     <FileEdit className="w-4 h-4" />
@@ -353,6 +379,7 @@ export function ResumeUpload() {
                   }
                   navigate('/job-analysis');
                 }}
+                disabled={parsedData?.parse_status === 'processing'}
               >
                 Continue to Job Analysis
               </Button>

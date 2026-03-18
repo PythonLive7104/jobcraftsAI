@@ -729,28 +729,8 @@ class ResumeUploadAPI(APIView):
             parse_status="processing",
         )
 
-        # Sync parse for now (easy). Move to Celery later.
-        try:
-            path = getattr(resume.original_file, "path", None)
-            if path:
-                if file_type == "pdf":
-                    text = extract_text_from_pdf(path)
-                else:
-                    text = extract_text_from_docx(path)
-            else:
-                with resume.original_file.open("rb") as fp:
-                    if file_type == "pdf":
-                        text = extract_text_from_pdf(fp)
-                    else:
-                        text = extract_text_from_docx(fp)
-
-            resume.extracted_text = _sanitize_extracted_text(text or "")
-            resume.parse_status = "done"
-            resume.save(update_fields=["extracted_text", "parse_status"])
-        except Exception as e:
-            resume.parse_status = "failed"
-            resume.parse_error = str(e)
-            resume.save(update_fields=["parse_status", "parse_error"])
+        from .tasks import parse_resume_task
+        parse_resume_task.delay(resume.id)
 
         payload = ResumeDetailSerializer(resume).data
         sub.refresh_from_db()
