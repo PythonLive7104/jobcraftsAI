@@ -7,7 +7,7 @@ import { Button } from '../ui/button';
 import { Label } from '../ui/label';
 import { Textarea } from '../ui/textarea';
 import { Badge } from '../ui/badge';
-import { fetchWithAuth, getErrorMessage, parseResponseBody } from '../../lib/api';
+import { fetchWithAuth, getErrorMessage, parseResponseBody, pollTaskUntilComplete } from '../../lib/api';
 
 type JobAnalysisResponse = {
   id: string;
@@ -64,7 +64,9 @@ export function JobAnalysis() {
         throw new Error(getErrorMessage(data, 'Failed to analyze job description'));
       }
 
-      setAnalysis(data as JobAnalysisResponse);
+      const { task_id } = data as { task_id: string };
+      const result = await pollTaskUntilComplete<JobAnalysisResponse>(task_id);
+      setAnalysis(result);
       window.localStorage.setItem('resumeai-last-job-description', jobDescription);
       window.localStorage.setItem('resumeai-last-job-title', jobTitle);
       toast.success('Job analysis completed');

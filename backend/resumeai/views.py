@@ -51,17 +51,37 @@ def _sanitize_extracted_text(text: str) -> str:
     return text.replace("\x00", "")
 
 
-from .ai import (
-    analyze_job_description_with_gpt5,
-    answer_help_question,
-    ats_optimize,
-    generate_cover_letter_with_gpt5,
-    generate_interview_prep_with_gpt5,
-    answer_custom_interview_questions,
-    linkedin_optimize,
-    career_gap_analyze,
-)
+from .ai import answer_help_question
 from .emailing import send_email_via_resend
+from django.core.cache import cache
+
+
+class TaskStatusAPI(APIView):
+    """Poll for async task result. Returns status, result (when done), or error (when failed)."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, task_id):
+        from celery.result import AsyncResult
+        from resumeai_backend.celery import app
+
+        cached_user_id = cache.get(f"celery_task_user:{task_id}")
+        if cached_user_id != request.user.id:
+            return Response({"error": "Task not found or access denied"}, status=404)
+
+        result = AsyncResult(task_id, app=app)
+        payload = {"status": result.status}
+        if result.successful():
+            payload["result"] = result.result
+        elif result.failed():
+            payload["error"] = str(result.result) if result.result else "Task failed"
+        return Response(payload)
+
+
+def _enqueue_ai_task(task, user_id: int, **kwargs) -> str:
+    """Enqueue task and store user_id in cache for auth. Returns task_id."""
+    async_result = task.delay(user_id=user_id, **kwargs)
+    cache.set(f"celery_task_user:{async_result.id}", user_id, timeout=3700)  # 1h+
+    return async_result.id
 
 
 class ContactMessageSerializer(serializers.Serializer):
@@ -863,6 +883,8 @@ class JobAnalysisAPI(APIView):
             )
 
     def _do_analyze(self, request, resume_id):
+        from .tasks import job_analysis_task
+
         resume = get_object_or_404(Resume, id=resume_id, user=request.user)
         job_description = (request.data.get("job_description") or "").strip()
         job_title = (request.data.get("job_title") or "").strip()
@@ -872,53 +894,22 @@ class JobAnalysisAPI(APIView):
         if resume.parse_status != "done":
             return Response({"error": "Resume not parsed yet"}, status=400)
 
-        try:
-            gpt_result = analyze_job_description_with_gpt5(
-                resume_text=resume.extracted_text or "",
-                job_description=job_description,
-                job_title=job_title,
-            )
-        except ValueError as exc:
-            return Response({"error": str(exc)}, status=503)
-        except OpenAIError:
-            return Response(
-                {"error": "OpenAI request failed. Check OPENAI_API_KEY in backend/.env and model access."},
-                status=502,
-            )
-        except json.JSONDecodeError:
-            return Response({"error": "GPT analysis failed: invalid JSON response."}, status=502)
-
-        keywords = gpt_result.get("keywords") or {}
-        match_data = gpt_result.get("match") or {}
-        if not isinstance(keywords, dict):
-            keywords = {}
-        if not isinstance(match_data, dict):
-            match_data = {}
-
-        analysis = JobAnalysis.objects.create(
-            resume=resume,
-            job_title=job_title[:120] if job_title else "",
+        task_id = _enqueue_ai_task(
+            job_analysis_task,
+            request.user.id,
+            resume_id=str(resume_id),
             job_description=job_description,
-            keywords=keywords,
-            match=match_data,
+            job_title=job_title,
         )
-
-        sub, _ = UserSubscription.objects.get_or_create(user=request.user)
-        sub.reset_if_new_month()
-        sub.increment(Feature.ATS_OPTIMIZE)
-
-        data = JobAnalysisSerializer(analysis).data
-        data["usage"] = {
-            "used": sub.uses_for(Feature.ATS_OPTIMIZE),
-            "limit": sub.limit_for(Feature.ATS_OPTIMIZE),
-        }
-        return Response(data, status=201)
+        return Response({"task_id": task_id}, status=202)
 
 
 class ATSOptimizeAPI(APIView):
     permission_classes = [IsAuthenticated, IsEmailVerified, HasFeatureAccess.with_feature(Feature.ATS_OPTIMIZE)]
 
     def post(self, request, resume_id):
+        from .tasks import ats_optimize_task
+
         resume = get_object_or_404(Resume, id=resume_id, user=request.user)
         if resume.parse_status != "done":
             return Response({"error": "Resume not parsed yet"}, status=400)
@@ -930,53 +921,23 @@ class ATSOptimizeAPI(APIView):
         if not job_description:
             return Response({"error": "job_description is required"}, status=400)
 
-        try:
-            result = ats_optimize(
-                resume_text=resume.extracted_text,
-                job_description=job_description,
-                target_role=target_role,
-                job_title=job_title,
-            )
-        except ValueError as exc:
-            return Response({"error": str(exc)}, status=503)
-        except OpenAIError:
-            return Response(
-                {"error": "OpenAI request failed. Check OPENAI_API_KEY in backend/.env and ATS model access."},
-                status=502,
-            )
-        except json.JSONDecodeError:
-            return Response({"error": "GPT ATS optimization failed: invalid JSON response."}, status=502)
-
-        version = ResumeVersion.objects.create(
-            resume=resume,
-            title=f"ATS Optimized ({target_role or 'General'})",
+        task_id = _enqueue_ai_task(
+            ats_optimize_task,
+            request.user.id,
+            resume_id=str(resume_id),
+            job_description=job_description,
             target_role=target_role,
             job_title=job_title,
-            optimized_text=result["optimized_resume_text"],
-            ats_score=int(result["score"]),
         )
-
-        # increment usage
-        sub, _ = UserSubscription.objects.get_or_create(user=request.user)
-        sub.reset_if_new_month()
-        sub.increment(Feature.ATS_OPTIMIZE)
-
-        return Response({
-            "resume_id": str(resume.id),
-            "version": ResumeVersionSerializer(version).data,
-            "ats": {
-                "score": result["score"],
-                "breakdown": result["breakdown"],
-                "missing_keywords": result["missing_keywords"],
-                "suggestions": result["suggestions"],
-            }
-        }, status=200)
+        return Response({"task_id": task_id}, status=202)
 
 
 class LinkedInOptimizeAPI(APIView):
     permission_classes = [IsAuthenticated, IsEmailVerified, HasFeatureAccess.with_feature(Feature.LINKEDIN)]
 
     def post(self, request):
+        from .tasks import linkedin_optimize_task
+
         target_role = request.data.get("target_role", "").strip()
         headline = request.data.get("headline", "").strip()
         about = request.data.get("about", "").strip()
@@ -985,53 +946,23 @@ class LinkedInOptimizeAPI(APIView):
         if not target_role:
             return Response({"error": "target_role is required"}, status=400)
 
-        try:
-            result = linkedin_optimize(target_role, headline, about, experience)
-        except ValueError as exc:
-            return Response({"error": str(exc)}, status=503)
-        except OpenAIError:
-            return Response(
-                {"error": "OpenAI request failed. Check OPENAI_API_KEY in backend/.env and LinkedIn model access."},
-                status=502,
-            )
-        except json.JSONDecodeError:
-            return Response({"error": "GPT LinkedIn optimization failed: invalid JSON response."}, status=502)
-
-        sub, _ = UserSubscription.objects.get_or_create(user=request.user)
-        sub.reset_if_new_month()
-        sub.increment(Feature.LINKEDIN)
-        UserActivity.objects.create(
-            user=request.user,
-            action=UserActivityAction.LINKEDIN,
-            detail=target_role,
-        )
-
-        LinkedInOptimization.objects.create(
-            user=request.user,
+        task_id = _enqueue_ai_task(
+            linkedin_optimize_task,
+            request.user.id,
             target_role=target_role,
-            headlines=result["headlines"],
-            about_versions=result["about_versions"],
-            experience_rewrites=result["experience_rewrites"],
-            recommended_skills=result["recommended_skills"],
+            headline=headline,
+            about=about,
+            experience=experience,
         )
-
-        return Response({
-            "target_role": target_role,
-            "headlines": result["headlines"],
-            "about_versions": result["about_versions"],
-            "experience_rewrites": result["experience_rewrites"],
-            "recommended_skills": result["recommended_skills"],
-            "usage": {
-                "used": sub.uses_for(Feature.LINKEDIN),
-                "limit": sub.limit_for(Feature.LINKEDIN),
-            },
-        })
+        return Response({"task_id": task_id}, status=202)
 
 
 class CoverLetterAPI(APIView):
     permission_classes = [IsAuthenticated, IsEmailVerified, HasFeatureAccess.with_feature(Feature.COVER_LETTER)]
 
     def post(self, request, resume_id):
+        from .tasks import cover_letter_task
+
         resume = get_object_or_404(Resume, id=resume_id, user=request.user)
         if resume.parse_status != "done":
             return Response({"error": "Resume not parsed yet"}, status=400)
@@ -1048,57 +979,29 @@ class CoverLetterAPI(APIView):
         if not job_description:
             return Response({"error": "job_description is required"}, status=400)
 
-        try:
-            letter = generate_cover_letter_with_gpt5(
-                resume_text=resume.extracted_text,
-                company_name=company_name,
-                job_title=job_title,
-                tone=tone,
-                job_description=job_description,
-            )
-        except ValueError as exc:
-            return Response({"error": str(exc)}, status=503)
-        except OpenAIError:
-            return Response(
-                {"error": "OpenAI request failed. Check OPENAI_API_KEY in backend/.env and cover letter model access."},
-                status=502,
-            )
-
-        sub, _ = UserSubscription.objects.get_or_create(user=request.user)
-        sub.reset_if_new_month()
-        sub.increment(Feature.COVER_LETTER)
-        UserActivity.objects.create(
-            user=request.user,
-            action=UserActivityAction.COVER_LETTER,
-            detail=f"{job_title} at {company_name}",
+        task_id = _enqueue_ai_task(
+            cover_letter_task,
+            request.user.id,
+            resume_id=str(resume_id),
+            company_name=company_name,
+            job_title=job_title,
+            tone=tone,
+            job_description=job_description,
         )
-
-        return Response(
-            {
-                "resume_id": str(resume.id),
-                "company_name": company_name,
-                "job_title": job_title,
-                "tone": tone,
-                "cover_letter": letter,
-                "usage": {
-                    "used": sub.uses_for(Feature.COVER_LETTER),
-                    "limit": sub.limit_for(Feature.COVER_LETTER),
-                },
-            },
-            status=200,
-        )
+        return Response({"task_id": task_id}, status=202)
 
 
 class InterviewPrepAPI(APIView):
     permission_classes = [IsAuthenticated, IsEmailVerified, HasFeatureAccess.with_feature(Feature.INTERVIEW_PREP)]
 
     def post(self, request, resume_id):
+        from .tasks import interview_prep_task
+
         resume = get_object_or_404(Resume, id=resume_id, user=request.user)
         if resume.parse_status != "done":
             return Response({"error": "Resume not parsed yet"}, status=400)
 
         job_title = request.data.get("job_title", "").strip()
-        # Backward compatible: accept old `job_description` payload too.
         job_requirements = (
             request.data.get("job_requirements", "").strip()
             or request.data.get("job_description", "").strip()
@@ -1113,63 +1016,23 @@ class InterviewPrepAPI(APIView):
         if not job_title:
             return Response({"error": "job_title is required"}, status=400)
 
-        try:
-            prep = generate_interview_prep_with_gpt5(
-                resume_text=resume.extracted_text,
-                job_title=job_title,
-                job_requirements=job_requirements,
-            )
-            categories = list(prep.get("categories", []))
-
-            if custom_questions:
-                custom_answers = answer_custom_interview_questions(
-                    questions=custom_questions,
-                    resume_text=resume.extracted_text or "",
-                    job_title=job_title,
-                    job_requirements=job_requirements,
-                )
-                if custom_answers:
-                    categories.append({
-                        "category": "Your Questions",
-                        "questions": custom_answers,
-                    })
-        except ValueError as exc:
-            return Response({"error": str(exc)}, status=503)
-        except OpenAIError:
-            return Response(
-                {"error": "OpenAI request failed. Check OPENAI_API_KEY in backend/.env and interview prep model access."},
-                status=502,
-            )
-        except json.JSONDecodeError:
-            return Response({"error": "GPT interview prep failed: invalid JSON response."}, status=502)
-
-        sub, _ = UserSubscription.objects.get_or_create(user=request.user)
-        sub.reset_if_new_month()
-        sub.increment(Feature.INTERVIEW_PREP)
-        UserActivity.objects.create(
-            user=request.user,
-            action=UserActivityAction.INTERVIEW_PREP,
-            detail=job_title,
+        task_id = _enqueue_ai_task(
+            interview_prep_task,
+            request.user.id,
+            resume_id=str(resume_id),
+            job_title=job_title,
+            job_requirements=job_requirements,
+            custom_questions=custom_questions,
         )
-
-        return Response(
-            {
-                "resume_id": str(resume.id),
-                "job_title": job_title,
-                "categories": categories,
-                "usage": {
-                    "used": sub.uses_for(Feature.INTERVIEW_PREP),
-                    "limit": sub.limit_for(Feature.INTERVIEW_PREP),
-                },
-            },
-            status=200,
-        )
+        return Response({"task_id": task_id}, status=202)
 
 
 class CareerGapAPI(APIView):
     permission_classes = [IsAuthenticated, IsEmailVerified, HasFeatureAccess.with_feature(Feature.CAREER_GAP)]
 
     def post(self, request):
+        from .tasks import career_gap_task
+
         target_role = request.data.get("target_role", "").strip()
         gap_reason = request.data.get("gap_reason", "").strip()
         gap_start = request.data.get("gap_start", "").strip()
@@ -1179,39 +1042,16 @@ class CareerGapAPI(APIView):
         if not (target_role and gap_reason and gap_start and gap_end):
             return Response({"error": "target_role, gap_reason, gap_start, gap_end are required"}, status=400)
 
-        try:
-            result = career_gap_analyze(target_role, gap_reason, gap_start, gap_end, what_you_did)
-        except ValueError as exc:
-            return Response({"error": str(exc)}, status=503)
-        except OpenAIError:
-            return Response(
-                {"error": "OpenAI request failed. Check OPENAI_API_KEY in backend/.env and career gap model access."},
-                status=502,
-            )
-        except json.JSONDecodeError:
-            return Response({"error": "GPT career gap analysis failed: invalid JSON response."}, status=502)
-
-        analysis = CareerGapAnalysis.objects.create(
-            user=request.user,
+        task_id = _enqueue_ai_task(
+            career_gap_task,
+            request.user.id,
             target_role=target_role,
             gap_reason=gap_reason,
             gap_start=gap_start,
             gap_end=gap_end,
             what_you_did=what_you_did,
-            result=result,
         )
-
-        sub, _ = UserSubscription.objects.get_or_create(user=request.user)
-        sub.reset_if_new_month()
-        sub.increment(Feature.CAREER_GAP)
-
-        payload = dict(result)
-        payload["analysis"] = CareerGapAnalysisSerializer(analysis).data
-        payload["usage"] = {
-            "used": sub.uses_for(Feature.CAREER_GAP),
-            "limit": sub.limit_for(Feature.CAREER_GAP),
-        }
-        return Response(payload)
+        return Response({"task_id": task_id}, status=202)
 
 
 class CareerGapHistoryAPI(APIView):

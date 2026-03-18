@@ -9,7 +9,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '..
 import { Badge } from '../ui/badge';
 import { AlertCircle, ChevronRight, GraduationCap, Lightbulb, Loader2, Plus, Sparkles, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { fetchWithAuth, getErrorMessage, parseResponseBody } from '../../lib/api';
+import { fetchWithAuth, getErrorMessage, parseResponseBody, pollTaskUntilComplete } from '../../lib/api';
 
 type InterviewQuestion = {
   question: string;
@@ -104,7 +104,8 @@ export function InterviewPrep() {
       if (!response.ok) {
         throw new Error(getErrorMessage(data, 'Failed to generate interview prep'));
       }
-      const payload = data as InterviewPrepResponse;
+      const { task_id } = data as { task_id: string };
+      const payload = await pollTaskUntilComplete<InterviewPrepResponse>(task_id);
       setCategories(payload.categories ?? []);
       if (payload.usage) setUsage(payload.usage);
       toast.success('Interview prep generated');

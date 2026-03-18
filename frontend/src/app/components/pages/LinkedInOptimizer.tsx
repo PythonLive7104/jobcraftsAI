@@ -8,7 +8,7 @@ import { Linkedin, Sparkles, Copy, CheckCircle, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
-import { fetchWithAuth, getErrorMessage, parseResponseBody } from '../../lib/api';
+import { fetchWithAuth, getErrorMessage, parseResponseBody, pollTaskUntilComplete } from '../../lib/api';
 
 type LinkedInOptimizeResponse = {
   headlines: string[];
@@ -86,7 +86,8 @@ export function LinkedInOptimizer() {
         throw new Error(getErrorMessage(data, 'Failed to optimize LinkedIn profile'));
       }
 
-      const payload = data as LinkedInOptimizeResponse;
+      const { task_id } = data as { task_id: string };
+      const payload = await pollTaskUntilComplete<LinkedInOptimizeResponse>(task_id);
       setResult(payload);
       if (payload.usage) setUsage(payload.usage);
       setOptimized(true);

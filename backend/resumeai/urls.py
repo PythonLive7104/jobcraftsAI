@@ -4,6 +4,7 @@ from .views import (
     ATSOptimizeAPI,
     ContactUsAPI,
     HelpChatAPI,
+    TaskStatusAPI,
     CoverLetterAPI,
     CareerGapAPI,
     CareerGapHistoryAPI,
@@ -33,6 +34,7 @@ from .views import (
 )
 
 urlpatterns = [
+    path("tasks/<str:task_id>/", TaskStatusAPI.as_view()),
     path("contact/", ContactUsAPI.as_view()),
     path("help/chat/", HelpChatAPI.as_view()),
     path("me/", MeAPI.as_view()),

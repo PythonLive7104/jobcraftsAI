@@ -10,7 +10,7 @@ import { Label } from '../ui/label';
 import { Textarea } from '../ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { toast } from 'sonner';
-import { fetchWithAuth, getErrorMessage, parseResponseBody } from '../../lib/api';
+import { fetchWithAuth, getErrorMessage, parseResponseBody, pollTaskUntilComplete } from '../../lib/api';
 
 type CareerGapResult = {
   gap_assessment?: {
@@ -158,7 +158,8 @@ export function CareerGap() {
       if (!response.ok) {
         throw new Error(getErrorMessage(data, 'Failed to analyze career gap'));
       }
-      const payload = data as CareerGapResponse;
+      const { task_id } = data as { task_id: string };
+      const payload = await pollTaskUntilComplete<CareerGapResponse>(task_id);
       setResult(payload);
       if (payload?.usage) setUsage(payload.usage);
       if (payload.analysis) {

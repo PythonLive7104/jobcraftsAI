@@ -9,7 +9,7 @@ import { Badge } from '../ui/badge';
 import { Label } from '../ui/label';
 import { Textarea } from '../ui/textarea';
 import { ResumeEditor, type ResumeEditorHandle } from '../ResumeEditor';
-import { fetchWithAuth, getErrorMessage, parseResponseBody } from '../../lib/api';
+import { fetchWithAuth, getErrorMessage, parseResponseBody, pollTaskUntilComplete } from '../../lib/api';
 
 type OptimizeSuggestion = {
   type?: string;
@@ -190,7 +190,8 @@ export function ResumeOptimization() {
         throw new Error(getErrorMessage(data, 'Failed to optimize resume'));
       }
 
-      const optimized = data as OptimizeResponse;
+      const { task_id } = data as { task_id: string };
+      const optimized = await pollTaskUntilComplete<OptimizeResponse>(task_id);
       setResult(optimized);
       void loadAtsUsage();
       window.localStorage.setItem('resumeai-last-job-description', jobDescription);

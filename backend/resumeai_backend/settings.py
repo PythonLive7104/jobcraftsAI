@@ -196,6 +196,7 @@ CELERY_ACCEPT_CONTENT = ["json"]
 CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_SERIALIZER = "json"
 CELERY_TIMEZONE = "UTC"
+CELERY_RESULT_EXPIRES = 3600  # 1 hour - keep task results for polling
 
 # Use eager mode when Redis is not available (e.g. local dev without Docker)
 CELERY_TASK_ALWAYS_EAGER = os.getenv("CELERY_TASK_ALWAYS_EAGER", "0") == "1"

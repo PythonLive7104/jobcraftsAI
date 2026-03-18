@@ -85,7 +85,7 @@ services:
       - CACHE_URL=redis://redis:6379/2
     volumes:
       - ./backend:/app/backend
-    command: celery -A resumeai_backend worker -l info --concurrency=4
+    command: celery -A resumeai_backend worker -l info --concurrency=8
     depends_on:
       backend:
         condition: service_healthy

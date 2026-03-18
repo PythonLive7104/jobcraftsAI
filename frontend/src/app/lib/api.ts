@@ -109,3 +109,28 @@ export const parseResponseBody = async (response: Response): Promise<unknown> =>
 };
 
 export { buildUrl };
+
+/** Poll task status until SUCCESS or FAILURE. Resolves with result or rejects with error. */
+export async function pollTaskUntilComplete<T = unknown>(
+  taskId: string,
+  options?: { intervalMs?: number; maxAttempts?: number }
+): Promise<T> {
+  const intervalMs = options?.intervalMs ?? 2000;
+  const maxAttempts = options?.maxAttempts ?? 180; // 6 min at 2s
+
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    const res = await fetchWithAuth(`/tasks/${taskId}/`);
+    const data = (await parseResponseBody(res)) as { status: string; result?: T; error?: string };
+    if (!res.ok) {
+      throw new Error(getErrorMessage(data, 'Failed to fetch task status'));
+    }
+    if (data.status === 'SUCCESS' && data.result !== undefined) {
+      return data.result as T;
+    }
+    if (data.status === 'FAILURE') {
+      throw new Error(data.error ?? 'Task failed');
+    }
+    await new Promise((r) => setTimeout(r, intervalMs));
+  }
+  throw new Error('Task timed out');
+}

@@ -8,7 +8,7 @@ import { Textarea } from '../ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { AlertCircle, Copy, Download, Loader2, MessageSquare, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
-import { fetchWithAuth, getErrorMessage, parseResponseBody } from '../../lib/api';
+import { fetchWithAuth, getErrorMessage, parseResponseBody, pollTaskUntilComplete } from '../../lib/api';
 
 type CoverLetterResponse = {
   cover_letter: string;
@@ -91,7 +91,8 @@ export function CoverLetter() {
         throw new Error(getErrorMessage(data, 'Failed to generate cover letter'));
       }
 
-      const payload = data as CoverLetterResponse;
+      const { task_id } = data as { task_id: string };
+      const payload = await pollTaskUntilComplete<CoverLetterResponse>(task_id);
       setGeneratedLetter(payload.cover_letter);
       if (payload.usage) setUsage(payload.usage);
       toast.success('Cover letter generated');
